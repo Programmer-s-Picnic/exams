@@ -1,9 +1,0 @@
-const Auth={
-  key:'he_users',sessionKey:'he_session',
-  users(){return JSON.parse(localStorage.getItem(this.key)||'[]')},
-  async remoteUsers(){try{const base=window.APP_CONFIG?.dataBase||'https://raw.githubusercontent.com/Programmer-s-Picnic/examsdata/main';const response=await fetch(`${base}/users-registered.json`,{cache:'no-store'});if(!response.ok)throw new Error();const data=await response.json();return data.users.filter(user=>user.demo===true&&user.status==='active')}catch{return []}},
-  async hash(value){const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value));return [...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,'0')).join('')},
-  async register(data){const users=this.users(),email=data.email.trim().toLowerCase(),remote=await this.remoteUsers();if(users.some(u=>u.email===email)||remote.some(u=>u.email===email))throw new Error('This email is already registered.');const user={id:crypto.randomUUID?.()||String(Date.now()),name:data.name.trim(),email,mobile:data.mobile,passwordHash:await this.hash(data.password),targetExamId:data.targetExamId,role:'student',status:'active',demo:false,createdAt:new Date().toISOString()};users.push(user);localStorage.setItem(this.key,JSON.stringify(users));return user},
-  async login(email,password){const normalized=email.trim().toLowerCase(),passwordHash=await this.hash(password),candidates=[...this.users(),...await this.remoteUsers()];const user=candidates.find(u=>u.email.toLowerCase()===normalized&&u.passwordHash===passwordHash&&u.status==='active');if(!user)throw new Error('Incorrect email or password.');localStorage.setItem(this.sessionKey,JSON.stringify({id:user.id,name:user.name,email:user.email,role:user.role||'student',targetExamId:user.targetExamId,demo:Boolean(user.demo)}));return user},
-  session(){return JSON.parse(localStorage.getItem(this.sessionKey)||'null')},logout(){localStorage.removeItem(this.sessionKey)}
-};window.Auth=Auth;
