@@ -69,9 +69,7 @@ async function initialiseSampleTest() {
   mount.innerHTML = testMarkup();
 
   try {
-    const response = await fetch(TESTS_URL, { cache: 'no-store' });
-    if (!response.ok) throw new Error('tests.json');
-    const data = await response.json();
+    const data = await fetchData(TESTS_URL);
     testState.test = data.tests.find((test) => test.id === 'python-basics-sample-01');
     if (!testState.test) throw new Error('Python sample test not found');
 
