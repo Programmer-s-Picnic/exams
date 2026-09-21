@@ -3,8 +3,10 @@ const TESTS_URL = `${DATA_ROOT}/tests.json`;
 const testState = {
   test: null,
   mode: 'total-timed',
+  feedbackMode: 'on-completion',
   current: 0,
   answers: [],
+  checked: [],
   review: [],
   totalEndsAt: null,
   questionEndsAt: null,
@@ -47,6 +49,11 @@ function testMarkup() {
         <label><input type="radio" name="testMode" value="question-timed"> Per-question timed <small>30 seconds for every question</small></label>
         <label><input type="radio" name="testMode" value="untimed"> Untimed <small>Practise without a countdown</small></label>
       </fieldset>
+      <fieldset class="feedback-picker">
+        <legend>When should answers be checked?</legend>
+        <label><input type="radio" name="feedbackMode" value="per-question"> Check after each question <small>Show the result and explanation immediately.</small></label>
+        <label><input type="radio" name="feedbackMode" value="on-completion" checked> Check after full test <small>Show all results only after final submission.</small></label>
+      </fieldset>
       <div class="test-launch-actions">
         <button class="button" id="beginSampleTest">Start Python test</button>
         <button class="sound-toggle" id="testSound" type="button" aria-pressed="true">Sound: On</button>
@@ -87,8 +94,10 @@ function toggleTestSound(event) {
 
 function beginTest() {
   testState.mode = document.querySelector('input[name="testMode"]:checked').value;
+  testState.feedbackMode = document.querySelector('input[name="feedbackMode"]:checked').value;
   testState.current = 0;
   testState.answers = Array(testState.test.questions.length).fill(null);
+  testState.checked = Array(testState.test.questions.length).fill(false);
   testState.review = Array(testState.test.questions.length).fill(false);
   testState.totalEndsAt = testState.mode === 'total-timed'
     ? Date.now() + testState.test.timing.totalSeconds * 1000
@@ -117,8 +126,17 @@ function renderQuestion() {
   const question = testState.test.questions[testState.current];
   const total = testState.test.questions.length;
   const selected = testState.answers[testState.current];
+  const isChecked = testState.checked[testState.current];
+  const immediate = testState.feedbackMode === 'per-question';
   const clockLabel = testState.mode === 'total-timed' ? 'Total time' :
     testState.mode === 'question-timed' ? 'Question time' : 'Untimed';
+
+  const optionClass = (optionIndex) => {
+    if (!isChecked) return selected === optionIndex ? 'chosen' : '';
+    if (optionIndex === question.correctOption) return 'correct-answer';
+    if (selected === optionIndex) return 'wrong-answer';
+    return '';
+  };
 
   document.getElementById('liveTest').innerHTML = `
     <div class="test-toolbar">
@@ -133,20 +151,21 @@ function renderQuestion() {
         <h3>${question.question}</h3>
         <div class="answer-list">
           ${question.options.map((option, optionIndex) => `
-            <label class="answer-option ${selected === optionIndex ? 'chosen' : ''}">
-              <input type="radio" name="sampleAnswer" value="${optionIndex}" ${selected === optionIndex ? 'checked' : ''}>
+            <label class="answer-option ${optionClass(optionIndex)}">
+              <input type="radio" name="sampleAnswer" value="${optionIndex}" ${selected === optionIndex ? 'checked' : ''} ${isChecked ? 'disabled' : ''}>
               <span>${String.fromCharCode(65 + optionIndex)}. ${option}</span>
             </label>`).join('')}
         </div>
+        ${isChecked ? `<div class="instant-feedback ${selected === question.correctOption ? 'correct' : 'incorrect'}"><strong>${selected === question.correctOption ? 'Correct answer' : 'Incorrect answer'}</strong><p>${question.explanation}</p></div>` : ''}
         <div class="question-actions">
-          <button class="button secondary" id="previousQuestion" ${testState.current === 0 ? 'disabled' : ''}>Previous</button>
+          <button class="button secondary" id="previousQuestion" ${testState.current === 0 || (immediate && !isChecked) ? 'disabled' : ''}>Previous</button>
           <button class="review-button" id="reviewQuestion">${testState.review[testState.current] ? 'Unmark review' : 'Mark for review'}</button>
-          <button class="button" id="nextQuestion">${testState.current === total - 1 ? 'Submit test' : 'Next'}</button>
+          <button class="button" id="nextQuestion" ${immediate && !isChecked && selected === null ? 'disabled' : ''}>${immediate && !isChecked ? 'Check answer' : testState.current === total - 1 ? 'Submit test' : 'Next'}</button>
         </div>
       </article>
       <aside class="question-palette" aria-label="Question palette">
         <strong>Questions</strong>
-        <div>${testState.test.questions.map((item, i) => `<button class="${testState.answers[i] !== null ? 'answered' : ''} ${testState.review[i] ? 'reviewed' : ''} ${i === testState.current ? 'current' : ''}" data-question="${i}">${i + 1}</button>`).join('')}</div>
+        <div>${testState.test.questions.map((item, i) => `<button class="${testState.answers[i] !== null ? 'answered' : ''} ${testState.checked[i] ? 'checked' : ''} ${testState.review[i] ? 'reviewed' : ''} ${i === testState.current ? 'current' : ''}" data-question="${i}" ${immediate && !isChecked && i !== testState.current ? 'disabled' : ''}>${i + 1}</button>`).join('')}</div>
       </aside>
     </div>`;
 
@@ -160,8 +179,13 @@ function renderQuestion() {
   });
   document.getElementById('previousQuestion').addEventListener('click', () => openQuestion(testState.current - 1));
   document.getElementById('nextQuestion').addEventListener('click', () => {
-    if (testState.current === total - 1) finishTest();
-    else openQuestion(testState.current + 1);
+    if (immediate && !testState.checked[testState.current]) {
+      checkCurrentAnswer();
+    } else if (testState.current === total - 1) {
+      finishTest();
+    } else {
+      openQuestion(testState.current + 1);
+    }
   });
   document.getElementById('reviewQuestion').addEventListener('click', () => {
     testState.review[testState.current] = !testState.review[testState.current];
@@ -172,6 +196,15 @@ function renderQuestion() {
     button.addEventListener('click', () => openQuestion(Number(button.dataset.question)));
   });
   document.getElementById('liveSound').addEventListener('click', toggleTestSound);
+}
+
+function checkCurrentAnswer() {
+  if (testState.answers[testState.current] === null) return;
+  testState.checked[testState.current] = true;
+  const question = testState.test.questions[testState.current];
+  testTone(testState.answers[testState.current] === question.correctOption ? 880 : 300, 0.2);
+  renderQuestion();
+  if (testState.mode !== 'untimed') updateClock();
 }
 
 function updateClock() {
@@ -189,6 +222,7 @@ function updateClock() {
     if (testState.mode === 'total-timed' || testState.current === testState.test.questions.length - 1) {
       finishTest();
     } else {
+      if (testState.feedbackMode === 'per-question') testState.checked[testState.current] = true;
       openQuestion(testState.current + 1);
     }
   }
