@@ -1,9 +1,25 @@
 const DATA_ROOT = 'https://raw.githubusercontent.com/Programmer-s-Picnic/examsdata/main';
 
+async function fetchData(url, options = {}) {
+  const { responseType = 'json', ...fetchOptions } = options;
+  const response = await fetch(url, {
+    cache: 'no-store',
+    ...fetchOptions
+  });
+
+  if (!response.ok) {
+    throw new Error(`Could not load ${url} (HTTP ${response.status})`);
+  }
+
+  if (responseType === 'text') return response.text();
+  if (responseType === 'response') return response;
+  return response.json();
+}
+
 async function loadText(id, file) {
-  const response = await fetch(file);
-  if (!response.ok) throw new Error(file);
-  document.getElementById(id).innerHTML = await response.text();
+  document.getElementById(id).innerHTML = await fetchData(file, {
+    responseType: 'text'
+  });
 }
 
 function applySite(site) {
@@ -50,14 +66,11 @@ function renderNavigation(navigation) {
 
 async function start() {
   try {
-    const [siteResponse] = await Promise.all([
-      fetch(`${DATA_ROOT}/site-main.json`, { cache: 'no-store' }),
+    const [config] = await Promise.all([
+      fetchData(`${DATA_ROOT}/site-main.json`),
       loadText('site-header', 'header.html'),
       loadText('site-footer', 'footer.html')
     ]);
-    if (!siteResponse.ok) throw new Error('site-main.json');
-
-    const config = await siteResponse.json();
     applySite(config.site);
     renderNavigation(config.navigation || []);
 
