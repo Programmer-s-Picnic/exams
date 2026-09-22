@@ -1,6 +1,6 @@
-# Himanshu Exams Android app
+# Himanshu Exams mobile app
 
-Native Flutter client for the Himanshu Exams platform.
+Native Flutter client for Android and iOS.
 
 ## Features
 
@@ -17,7 +17,7 @@ Native Flutter client for the Himanshu Exams platform.
 - Email: `student@example.com`
 - Password: `demo123`
 
-## Build
+## Android build
 
 ```bash
 flutter pub get
@@ -25,4 +25,14 @@ flutter analyze
 flutter build apk --release
 ```
 
-The GitHub workflow publishes the current APK to `releases/himanshu-exams.apk`.
+The Android workflow publishes `releases/himanshu-exams.apk`.
+
+## iOS build
+
+```bash
+flutter pub get
+flutter analyze
+flutter build ios --release
+```
+
+The iOS workflow runs on macOS, creates the native iOS scaffold, verifies the Flutter source and publishes `releases/himanshu-exams-ios-unsigned.zip`. Installing on an iPhone or distributing through TestFlight/App Store requires Apple Developer signing credentials and a provisioning profile.
