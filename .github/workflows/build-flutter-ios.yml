@@ -1,0 +1,53 @@
+name: Build Flutter iOS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'flutter_app/**'
+      - '.github/workflows/build-flutter-ios.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Complete iOS scaffold
+        working-directory: flutter_app
+        run: |
+          flutter create --platforms=ios --org live.learnwithchampak --project-name himanshu_exams .
+          rm -f test/widget_test.dart
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Himanshu Exams" ios/Runner/Info.plist
+      - name: Get packages
+        working-directory: flutter_app
+        run: flutter pub get
+      - name: Verify source
+        working-directory: flutter_app
+        run: flutter analyze --no-fatal-infos
+      - name: Build unsigned iOS release
+        working-directory: flutter_app
+        run: flutter build ios --release --no-codesign
+      - name: Package unsigned iOS app
+        run: |
+          mkdir -p releases
+          ditto -c -k --sequesterRsrc --keepParent             flutter_app/build/ios/iphoneos/Runner.app             releases/himanshu-exams-ios-unsigned.zip
+      - name: Publish iOS scaffold and unsigned build
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add flutter_app/ios releases/himanshu-exams-ios-unsigned.zip
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Add Himanshu Exams iOS app"
+          git push
+      - uses: actions/upload-artifact@v4
+        with:
+          name: himanshu-exams-ios-unsigned
+          path: releases/himanshu-exams-ios-unsigned.zip
