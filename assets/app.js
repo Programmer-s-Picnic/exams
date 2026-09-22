@@ -80,6 +80,9 @@
     document.querySelectorAll('[data-site-short]').forEach(node => { node.textContent = site.shortName; });
     document.querySelectorAll('[data-site-tagline]').forEach(node => { node.textContent = site.tagline; });
     document.querySelectorAll('[data-site-year]').forEach(node => { node.textContent = new Date().getFullYear(); });
+    document.querySelectorAll('[data-footer-note]').forEach(node => { node.textContent = site.footerNote; });
+    document.getElementById('publicNav').innerHTML = state.config.navigation.public.map(item => `<a href="${item.route}">${item.label}</a>`).join('');
+    document.getElementById('footerNav').innerHTML = state.config.navigation.footer.map(item => `<a href="${item.route}">${item.label}</a>`).join('');
     updateUserShell();
   }
 
@@ -106,27 +109,42 @@
   function updateUserShell() {
     const loggedIn = Boolean(state.user);
     document.body.classList.toggle('logged-out', !loggedIn);
+    document.body.classList.toggle('logged-in', loggedIn);
     document.getElementById('headerStudent').textContent = state.user?.name?.split(' ')[0] || 'Student';
     document.getElementById('headerAvatar').textContent = state.user?.name?.charAt(0).toUpperCase() || 'S';
+    document.getElementById('profileButton').hidden = !loggedIn;
+    document.getElementById('soundButton').hidden = !loggedIn;
+    document.getElementById('headerSignIn').hidden = loggedIn;
+    document.getElementById('headerCta').hidden = loggedIn;
+    document.getElementById('publicNav').hidden = loggedIn;
   }
 
   function currentRoute() {
-    const parts = (location.hash.replace(/^#\//, '') || 'home').split('/');
+    const parts = (location.hash.replace(/^#\//, '') || (state.user ? 'home' : 'landing')).split('/');
     return { name: parts[0], id: parts[1] };
   }
 
   function route() {
     TestEngine.stop();
     closeModal();
-    if (!state.user) return renderLogin();
     const { name, id } = currentRoute();
-    if (!state.preferences.primary && name !== 'onboarding' && name !== 'profile') {
+    const publicRoutes = ['landing', 'landing-exams', 'landing-how', 'login'];
+    if (!state.user && !publicRoutes.includes(name)) {
+      sessionStorage.setItem('he_after_login', location.hash || '#/home');
+      location.hash = '#/login';
+      return;
+    }
+    if (state.user && !state.preferences.primary && name !== 'onboarding' && name !== 'profile') {
       location.hash = '#/onboarding';
       return;
     }
     document.querySelectorAll('[data-nav]').forEach(link => link.classList.toggle('active', link.dataset.nav === (name === 'result' ? 'results' : name)));
     document.body.classList.toggle('focus-mode', name === 'attempt');
     const routes = {
+      landing: renderLanding,
+      'landing-exams': () => renderLanding('landingExams'),
+      'landing-how': () => renderLanding('landingHow'),
+      login: renderLogin,
       home: renderDashboard,
       onboarding: renderOnboarding,
       tests: renderTests,
@@ -138,20 +156,72 @@
       profile: renderProfile,
       help: renderHelp
     };
-    (routes[name] || renderDashboard)();
+    (routes[name] || (state.user ? renderDashboard : renderLanding))();
     window.scrollTo(0, 0);
   }
 
+  function renderLanding(scrollTarget = null) {
+    document.body.classList.remove('auth-mode');
+    const content = state.config.content.landing;
+    const verification = state.config.content.verification;
+    const questionCount = state.tests.reduce((total, test) => total + test.questions.length, 0);
+    const capabilities = content.capabilities.map(item => {
+      const value = item.valueFrom === 'questionCount' ? `${questionCount}${item.suffix || ''}` : item.value;
+      return `<div><strong>${value}</strong><span>${item.label}</span></div>`;
+    }).join('');
+    const featuredTest = state.tests.find(test => test.id === 'common-foundation-diagnostic') || state.tests[0];
+    document.getElementById('app').innerHTML = `
+      <div class="public-landing">
+        <section class="verification-strip"><span>${verification.label}</span><p>${verification.message}</p><time>Checked ${formatDate(verification.lastChecked)}</time></section>
+        <section class="landing-hero">
+          <div class="landing-glow one"></div><div class="landing-glow two"></div>
+          <div class="landing-hero-inner">
+            <span class="landing-badge">◆ ${content.badge}</span>
+            <h1>${content.titleBefore}<br><em>${content.titleHighlight}</em></h1>
+            <p>${content.description}</p>
+            <div class="landing-actions"><a class="mint-button" href="${content.primaryAction.route}">▶ ${content.primaryAction.label}</a><a class="dark-button" href="${content.secondaryAction.route}">${content.secondaryAction.label} →</a></div>
+            <div class="capability-grid">${capabilities}</div>
+          </div>
+        </section>
+        <section class="landing-section" id="landingExams">
+          <div class="landing-section-head"><div><span class="landing-eyebrow">${content.exams.eyebrow}</span><h2>${content.exams.title}</h2><p>${content.exams.description}</p></div></div>
+          <div class="public-exam-grid">${state.exams.map(publicExamCard).join('')}</div>
+        </section>
+        <section class="landing-section diagnostic-section">
+          <article class="diagnostic-panel">
+            <div><span class="landing-eyebrow">${content.diagnostic.eyebrow}</span><h2>${content.diagnostic.title}</h2><p>${content.diagnostic.description}</p><div class="diagnostic-facts">${content.diagnostic.facts.map(fact => `<span>✓ ${fact}</span>`).join('')}</div></div>
+            <div class="diagnostic-preview"><span class="preview-label">${featuredTest.category}</span><h3>${featuredTest.title}</h3><div><b>${featuredTest.questions.length}</b><small>Questions</small></div><div><b>${Math.round(featuredTest.timing.totalSeconds / 60)}</b><small>Minutes</small></div><a class="mint-button" href="#/login">${content.diagnostic.actionLabel} →</a></div>
+          </article>
+        </section>
+        <section class="landing-section" id="landingHow">
+          <div class="landing-section-head centered"><span class="landing-eyebrow">${content.how.eyebrow}</span><h2>${content.how.title}</h2></div>
+          <div class="how-grid">${content.how.steps.map(step => `<article><span>${step.number}</span><h3>${step.title}</h3><p>${step.description}</p></article>`).join('')}</div>
+        </section>
+        <section class="landing-section"><article class="landing-final-cta"><div><h2>${content.finalCta.title}</h2><p>${content.finalCta.description}</p></div><a class="mint-button" href="${content.finalCta.route}">${content.finalCta.label} →</a></article></section>
+      </div>`;
+    document.querySelectorAll('[data-public-exam]').forEach(button => button.addEventListener('click', () => {
+      sessionStorage.setItem('he_preselected_exam', button.dataset.publicExam);
+      sessionStorage.setItem('he_after_login', '#/onboarding');
+      location.hash = '#/login';
+    }));
+    if (scrollTarget) setTimeout(() => document.getElementById(scrollTarget)?.scrollIntoView({ behavior: 'smooth' }), 20);
+  }
+
+  function publicExamCard(exam) {
+    return `<article class="public-exam-card"><div class="public-exam-top"><span class="exam-icon">${icon(exam.icon)}</span><i>${exam.status}</i></div><h3>${exam.name}</h3><p>${exam.description}</p><dl><div><dt>Authority</dt><dd>${exam.authority}</dd></div><div><dt>Negative marking</dt><dd>${exam.negativeMarking || 'None'}</dd></div><div><dt>Subjects</dt><dd>${exam.subjects.length}</dd></div></dl><button type="button" data-public-exam="${exam.id}">Select this exam →</button></article>`;
+  }
+
   function renderLogin() {
-    document.body.classList.add('logged-out');
+    document.body.classList.add('logged-out', 'auth-mode');
+    const copy = state.config.content.login;
     document.getElementById('app').innerHTML = `
       <section class="auth-page">
         <div class="auth-glow one"></div><div class="auth-glow two"></div>
         <article class="auth-card">
           <div class="auth-brand"><span class="brand-mark">HE</span><strong>Himanshu Exams</strong></div>
-          <span class="eyebrow">STUDENT PORTAL</span>
-          <h1>Welcome back</h1>
-          <p>Continue your preparation with tests, feedback and a clear plan.</p>
+          <span class="eyebrow">${copy.eyebrow}</span>
+          <h1>${copy.title}</h1>
+          <p>${copy.description}</p>
           <form id="loginForm">
             <label>Mobile number or email<input id="loginId" autocomplete="username" required placeholder="student@example.com"></label>
             <label>Password<span class="password-wrap"><input id="loginPassword" type="password" autocomplete="current-password" required placeholder="Enter your password"><button type="button" id="showPassword" aria-label="Show password">Show</button></span></label>
@@ -159,7 +229,7 @@
             <p class="form-error" id="loginError" role="alert"></p>
             <button class="primary-button full" type="submit">Sign in securely →</button>
           </form>
-          <div class="demo-login"><strong>Demo account</strong><span>student@example.com</span><span>Password: demo123</span></div>
+          <div class="demo-login"><strong>Demo account</strong><span>${copy.demoEmail}</span><span>Password: ${copy.demoPassword}</span></div>
           <div class="trust-row"><span>✓ Student-first design</span><span>✓ Progress saved</span></div>
         </article>
       </section>`;
@@ -181,21 +251,31 @@
       state.user = { id: user.id, name: user.name, email: user.email, mobile: user.mobile };
       write(KEYS.user, state.user);
       updateUserShell();
-      location.hash = state.preferences.primary ? '#/home' : '#/onboarding';
+      document.body.classList.remove('auth-mode');
+      const preselected = sessionStorage.getItem('he_preselected_exam');
+      if (preselected) {
+        state.preferences = { selected: [preselected], primary: preselected };
+        sessionStorage.removeItem('he_preselected_exam');
+      }
+      const requested = sessionStorage.getItem('he_after_login');
+      sessionStorage.removeItem('he_after_login');
+      location.hash = requested || (state.preferences.primary ? '#/home' : '#/onboarding');
     });
   }
 
   function renderOnboarding() {
+    document.body.classList.remove('auth-mode');
+    const copy = state.config.content.onboarding;
     const selected = new Set(state.preferences.selected || []);
     const primary = state.preferences.primary;
     document.getElementById('app').innerHTML = `
       <section class="onboarding-page">
         <div class="stepbar"><button class="icon-button" id="onboardingBack">←</button><span><i></i>Step 1 of 2 · Personalise your plan</span><a href="#/help" class="icon-button">?</a></div>
         <div class="onboarding-hero">
-          <span class="eyebrow">YOUR PREPARATION, PERSONALISED</span>
-          <h1>Which exams are you preparing for?</h1>
-          <h2 lang="hi">आप किन परीक्षाओं की तैयारी कर रहे हैं?</h2>
-          <p>Choose one or more exams. We will combine common subjects and recommend the most useful tests.</p>
+          <span class="eyebrow">${copy.eyebrow}</span>
+          <h1>${copy.title}</h1>
+          <h2 lang="hi">${copy.titleHindi}</h2>
+          <p>${copy.description}</p>
         </div>
         <div class="exam-stack" id="examStack">
           ${state.exams.map(exam => examCard(exam, selected.has(exam.id), primary === exam.id)).join('')}
@@ -257,6 +337,8 @@
   }
 
   function renderDashboard() {
+    document.body.classList.remove('auth-mode');
+    const copy = state.config.content.dashboard;
     const primary = state.exams.find(exam => exam.id === state.preferences.primary);
     const relevantTests = state.tests.filter(test => test.examIds.includes(state.preferences.primary));
     const results = TestEngine.getResults();
@@ -267,7 +349,7 @@
     const nextTest = relevantTests.find(test => !completedIds.has(test.id)) || relevantTests[0] || state.tests[0];
     document.getElementById('app').innerHTML = `
       <section class="page dashboard">
-        <div class="welcome-row"><div><span class="eyebrow">YOUR PREPARATION HUB</span><h1>Good ${dayPart()}, ${escapeHtml(state.user.name.split(' ')[0])}</h1><p>One clear next step is better than ten unfinished plans.</p></div><a class="ghost-button" href="#/onboarding">Change goal</a></div>
+        <div class="welcome-row"><div><span class="eyebrow">${copy.eyebrow}</span><h1>Good ${dayPart()}, ${escapeHtml(state.user.name.split(' ')[0])}</h1><p>${copy.description}</p></div><a class="ghost-button" href="#/onboarding">Change goal</a></div>
         <article class="focus-card">
           <div class="focus-copy"><span class="live-pill">● PRIMARY GOAL</span><h2>${primary?.name || 'Choose an examination'}</h2><p>${primary?.description || ''}</p><div class="focus-meta"><span>Authority <b>${primary?.authority || '—'}</b></span><span>Status <b>${primary?.status || '—'}</b></span></div></div>
           <div class="progress-ring" style="--progress:${average}"><span><strong>${average}%</strong><small>average</small></span></div>
@@ -280,9 +362,9 @@
           <article><span class="metric-icon amber">◎</span><strong>${results.filter(item => item.passed).length}</strong><small>Tests passed</small></article>
           <article><span class="metric-icon violet">↗</span><strong>${bestTopic(results)}</strong><small>Strongest topic</small></article>
         </div>
-        <div class="section-heading"><div><span class="eyebrow">RECOMMENDED NEXT</span><h2>Keep your momentum</h2></div><a href="#/tests">View all tests →</a></div>
+        <div class="section-heading"><div><span class="eyebrow">RECOMMENDED NEXT</span><h2>${copy.recommendedTitle}</h2></div><a href="#/tests">View all tests →</a></div>
         ${nextTest ? testCard(nextTest, results) : '<div class="empty-state">No matching test is available yet.</div>'}
-        <div class="section-heading"><div><span class="eyebrow">QUICK ACCESS</span><h2>Everything in one place</h2></div></div>
+        <div class="section-heading"><div><span class="eyebrow">QUICK ACCESS</span><h2>${copy.quickTitle}</h2></div></div>
         <div class="quick-grid">
           <a href="#/tests"><span>${icon('test')}</span><strong>Start a test</strong><small>Browse available practice</small></a>
           <a href="#/results"><span>${icon('chart')}</span><strong>Performance</strong><small>Review recent attempts</small></a>
