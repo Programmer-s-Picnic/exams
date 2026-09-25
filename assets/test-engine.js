@@ -265,7 +265,9 @@
     const result = {
       id: `result-${Date.now()}`,
       testId: state.test.id,
+      baseTestId: state.test.baseTestId || state.test.id,
       title: state.test.title,
+      questions: state.test.questions,
       date: new Date().toISOString(),
       answers: state.answers,
       correct,
