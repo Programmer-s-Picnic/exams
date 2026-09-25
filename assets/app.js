@@ -405,16 +405,28 @@
     return `<details class="json-node" ${depth < 2 ? 'open' : ''}><summary>${label}<span class="json-type">${kind} · ${pairs.length} ${pairs.length === 1 ? 'item' : 'items'}</span></summary><div class="json-children">${pairs.map(([childKey, item]) => jsonTree(item, childKey, depth + 1)).join('')}</div></details>`;
   }
 
+  function adminInfoIcon(name) {
+    const paths = {
+      file: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
+      purpose: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/>',
+      data: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
+      format: '<path d="m9 5-5 7 5 7M15 5l5 7-5 7M13 3l-2 18"/>',
+      keys: '<circle cx="8" cy="9" r="4"/><path d="m11 12 8 8m-3-3 2-2m-5-1 2-2"/>',
+      link: '<path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.2M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.2-1.2"/>'
+    };
+    return `<svg class="admin-info-icon" viewBox="0 0 24 24" aria-hidden="true">${paths[name] || paths.file}</svg>`;
+  }
+
   function adminFileInfo(file, manifest) {
     const detail = manifest.fileDetails?.[file.path] || {};
     const usedAt = detail.usedAt || [];
     const keyGroups = Object.entries(detail.keys || {});
     return `<section class="admin-file-info">
-      <div><span>Purpose</span><p>${escapeHtml(detail.purpose || 'Supporting project file.')}</p></div>
-      <div><span>Stored data</span><p>${escapeHtml(detail.storedData || 'Not applicable or not documented yet.')}</p></div>
-      <div><span>Format</span><p><code>${escapeHtml(detail.format || file.category)}</code></p></div>
-      ${keyGroups.length ? `<div class="admin-key-info"><span>Keys and integrity</span>${keyGroups.map(([type, keys]) => `<section><b>${escapeHtml(type)}</b><ul>${keys.map(key => `<li><code>${escapeHtml(key)}</code></li>`).join('')}</ul></section>`).join('')}</div>` : ''}
-      <div class="admin-used-at"><span>Used at</span>${usedAt.length ? `<ul>${usedAt.map(place => `<li><a href="${escapeHtml(place.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(place.label)}</a>${place.note ? `<small>${escapeHtml(place.note)}</small>` : ''}</li>`).join('')}</ul>` : '<p>Not currently connected to a public page; retained for future content.</p>'}</div>
+      <div><span>${adminInfoIcon('purpose')}Purpose</span><p>${escapeHtml(detail.purpose || 'Supporting project file.')}</p></div>
+      <div><span>${adminInfoIcon('data')}Stored data</span><p>${escapeHtml(detail.storedData || 'Not applicable or not documented yet.')}</p></div>
+      <div><span>${adminInfoIcon('format')}Format</span><p><code>${escapeHtml(detail.format || file.category)}</code></p></div>
+      ${keyGroups.length ? `<div class="admin-key-info"><span>${adminInfoIcon('keys')}Keys and integrity</span>${keyGroups.map(([type, keys]) => `<section><b>${escapeHtml(type)}</b><ul>${keys.map(key => `<li><code>${escapeHtml(key)}</code></li>`).join('')}</ul></section>`).join('')}</div>` : ''}
+      <div class="admin-used-at"><span>${adminInfoIcon('link')}Used at</span>${usedAt.length ? `<ul>${usedAt.map(place => `<li><a href="${escapeHtml(place.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(place.label)}</a>${place.note ? `<small>${escapeHtml(place.note)}</small>` : ''}</li>`).join('')}</ul>` : '<p>Not currently connected to a public page; retained for future content.</p>'}</div>
     </section>`;
   }
 
@@ -456,7 +468,7 @@
           const source = file.repository === 'examsdata' ? file.path : file.url;
           const isJson = file.category === 'JSON';
           const content = file.category === 'Images' ? null : await Api.request(source, isJson ? {} : { responseType: 'text' });
-          viewer.innerHTML = `<div class="admin-viewer-head"><div><span class="eyebrow">${escapeHtml(file.category)} · ${escapeHtml(file.repository)}</span><h2>${escapeHtml(file.path)}</h2></div><a class="ghost-button" href="${escapeHtml(file.url)}" target="_blank" rel="noopener noreferrer">Open file ↗</a></div>${adminFileInfo(file, manifest)}${isJson ? `<div class="admin-toolbar"><button type="button" id="adminTree" class="active">Tree view</button><button type="button" id="adminRaw">Formatted JSON</button><button type="button" id="adminCopy">Copy JSON</button></div><div id="adminJsonTree" class="json-viewer">${jsonTree(content)}</div><pre id="adminJsonRaw" class="admin-code" hidden><code>${escapeHtml(JSON.stringify(content, null, 2))}</code></pre>` : file.category === 'Images' ? `<div class="admin-image"><img src="${escapeHtml(file.url)}" alt="${escapeHtml(file.path)}" loading="lazy"></div>` : `<pre class="admin-code"><code>${escapeHtml(content)}</code></pre>`}`;
+          viewer.innerHTML = `<div class="admin-viewer-head"><div><span class="eyebrow">${escapeHtml(file.category)} · ${escapeHtml(file.repository)}</span><h2>${adminInfoIcon('file')}${escapeHtml(file.path)}</h2></div><a class="ghost-button" href="${escapeHtml(file.url)}" target="_blank" rel="noopener noreferrer">Open file ↗</a></div>${adminFileInfo(file, manifest)}${isJson ? `<div class="admin-toolbar"><button type="button" id="adminTree" class="active">Tree view</button><button type="button" id="adminRaw">Formatted JSON</button><button type="button" id="adminCopy">Copy JSON</button></div><div id="adminJsonTree" class="json-viewer">${jsonTree(content)}</div><pre id="adminJsonRaw" class="admin-code" hidden><code>${escapeHtml(JSON.stringify(content, null, 2))}</code></pre>` : file.category === 'Images' ? `<div class="admin-image"><img src="${escapeHtml(file.url)}" alt="${escapeHtml(file.path)}" loading="lazy"></div>` : `<pre class="admin-code"><code>${escapeHtml(content)}</code></pre>`}`;
           if (isJson) {
             document.getElementById('adminTree').onclick = () => { document.getElementById('adminJsonTree').hidden = false; document.getElementById('adminJsonRaw').hidden = true; };
             document.getElementById('adminRaw').onclick = () => { document.getElementById('adminJsonTree').hidden = true; document.getElementById('adminJsonRaw').hidden = false; };
