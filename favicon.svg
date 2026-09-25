@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Himanshu Exams</title>
+  <defs>
+    <linearGradient id="bg" x1="8" y1="5" x2="56" y2="59" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2cab6f"/>
+      <stop offset="1" stop-color="#0b5135"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="#081510"/>
+  <path d="M32 7 53 15v16c0 13-8 22-21 27C19 53 11 44 11 31V15L32 7Z" fill="url(#bg)" stroke="#82e5b5" stroke-width="2"/>
+  <path d="M20 22c5-2 9-1 12 2 3-3 7-4 12-2v19c-5-2-9-1-12 2-3-3-7-4-12-2V22Z" fill="#f4fff8"/>
+  <path d="M32 24v19M23 27h6M35 27h6M23 32h6M35 32h6" fill="none" stroke="#0b5135" stroke-linecap="round" stroke-width="2"/>
+  <path d="m25 37 2 2 4-5" fill="none" stroke="#2cab6f" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2"/>
+</svg>
