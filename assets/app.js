@@ -10,6 +10,7 @@
     users: [],
     exams: [],
     tests: [],
+    syllabus: [],
     user: read(KEYS.user),
     preferences: read(KEYS.preferences) || { selected: [], primary: null },
     sound: read(KEYS.sound) !== false,
@@ -50,18 +51,24 @@
 
   async function initialise() {
     try {
-      const [, , config, users, exams, tests] = await Promise.all([
+      const [, , config, users, exams, tests, syllabus] = await Promise.all([
         loadFragment('site-header', 'header.html'),
         loadFragment('site-footer', 'footer.html'),
         Api.request('site-main.json'),
         Api.request('users-registered.json'),
         Api.request('exams.json'),
-        Api.request('tests.json')
+        Api.request('tests.json'),
+        Api.request('exam-syllabus.json')
       ]);
       state.config = config;
       state.users = users.users || [];
       state.exams = exams.exams || [];
       state.tests = tests.tests || [];
+      try {
+        const retake = JSON.parse(sessionStorage.getItem('he_retake'));
+        if (retake?.id && Array.isArray(retake.questions)) state.tests.push(retake);
+      } catch (_) {}
+      state.syllabus = syllabus.syllabi || [];
       const available = state.exams.find(exam => exam.available)?.id;
       state.preferences.selected = (state.preferences.selected || []).filter(id => state.exams.some(exam => exam.id === id && exam.available));
       if (!state.preferences.selected.includes(state.preferences.primary)) state.preferences.primary = available && state.preferences.selected.includes(available) ? available : null;
@@ -149,6 +156,7 @@
       'landing-how': () => renderLanding('landingHow'),
       login: renderLogin,
       home: renderDashboard,
+      constable: renderConstable,
       onboarding: renderOnboarding,
       tests: renderTests,
       instructions: () => renderInstructions(id),
@@ -203,6 +211,10 @@
         <section class="landing-section"><article class="landing-final-cta"><div><h2>${content.finalCta.title}</h2><p>${content.finalCta.description}</p></div><a class="mint-button" href="${content.finalCta.route}">${content.finalCta.label} →</a></article></section>
       </div>`;
     document.querySelectorAll('[data-public-exam]').forEach(button => button.addEventListener('click', () => {
+      if (state.user && state.preferences.selected.includes(button.dataset.publicExam)) {
+        location.hash = '#/constable';
+        return;
+      }
       sessionStorage.setItem('he_preselected_exam', button.dataset.publicExam);
       sessionStorage.setItem('he_after_login', '#/onboarding');
       location.hash = '#/login';
@@ -298,6 +310,7 @@
 
     document.querySelectorAll('[data-exam-select]').forEach(button => button.addEventListener('click', () => {
       const id = button.dataset.examSelect;
+      if (selected.has(id) && state.preferences.primary === id) { location.hash = '#/constable'; return; }
       if (selected.has(id)) selected.delete(id); else selected.add(id);
       if (!selected.has(state.preferences.primary)) state.preferences.primary = selected.values().next().value || null;
       state.preferences.selected = [...selected];
@@ -354,10 +367,10 @@
     document.getElementById('app').innerHTML = `
       <section class="page dashboard">
         <div class="welcome-row"><div><span class="eyebrow">${copy.eyebrow}</span><h1>Good ${dayPart()}, ${escapeHtml(state.user.name.split(' ')[0])}</h1><p>${copy.description}</p></div><a class="ghost-button" href="#/onboarding">Change goal</a></div>
-        <article class="focus-card">
+        <article class="focus-card" id="primaryExamCard" role="link" tabindex="0" aria-label="Open UP Police Constable exam">
           <div class="focus-copy"><span class="live-pill">● PRIMARY GOAL</span><h2>${primary?.name || 'Choose an examination'}</h2><p>${primary?.description || ''}</p><div class="focus-meta"><span>Authority <b>${primary?.authority || '—'}</b></span><span>Status <b>${primary?.status || '—'}</b></span></div></div>
           <div class="progress-ring" style="--progress:${average}"><span><strong>${average}%</strong><small>average</small></span></div>
-          <a class="primary-button" href="#/tests">Continue preparation →</a>
+          <a class="primary-button" href="#/constable">Open Constable exam →</a>
         </article>
         ${active ? `<article class="resume-banner"><div><span class="eyebrow">SAVED ATTEMPT</span><h3>${state.tests.find(test => test.id === active.testId)?.title || 'Your test'}</h3><p>Question ${active.current + 1} · Your answers are safely stored.</p></div><a class="primary-button" href="#/attempt/${active.testId}">Resume test</a></article>` : ''}
         <div class="metrics-grid">
@@ -376,6 +389,32 @@
           <a href="#/help"><span>${icon('teacher')}</span><strong>Help centre</strong><small>Understand test modes</small></a>
         </div>
       </section>`;
+    const focusCard = document.getElementById('primaryExamCard');
+    focusCard.addEventListener('click', event => { if (!event.target.closest('a, button')) location.hash = '#/constable'; });
+    focusCard.addEventListener('keydown', event => { if (event.target === focusCard && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); location.hash = '#/constable'; } });
+  }
+
+  function renderConstable() {
+    const exam = state.exams.find(item => item.id === 'up-police');
+    const syllabus = state.syllabus.find(item => item.examId === exam?.id);
+    if (!exam || !syllabus) return notFound('Constable information is unavailable');
+    const tests = state.tests.filter(test => test.id.startsWith('up-police-constable-') && !test.baseTestId);
+    const results = TestEngine.getResults().filter(result => tests.some(test => test.id === (result.baseTestId || result.testId)));
+    const latest = results[0];
+    const weak = latest && Object.entries(latest.topicScores || {}).sort((a, b) => a[1].correct / a[1].total - b[1].correct / b[1].total)[0]?.[0];
+    document.getElementById('app').innerHTML = `
+      <section class="page constable-hub">
+        <a class="back-link" href="#/home">← Dashboard</a>
+        <div class="page-hero"><span class="eyebrow">YOUR EXAM</span><h1>${escapeHtml(exam.name)}</h1><p>${escapeHtml(exam.description)}</p><small>Sources checked ${escapeHtml(exam.verifiedAt)} · Preparation content is independent of the recruitment board.</small></div>
+        <nav class="hub-nav" aria-label="Constable sections">${[['overview','Overview'],['syllabus','Syllabus'],['practice','Practice'],['settings','Test modes'],['results','Results'],['stages','Stages']].map(([id,label]) => `<button type="button" data-hub-section="constable-${id}">${label}</button>`).join('')}</nav>
+        <section class="hub-section" id="constable-overview"><h2>Exam overview and official sources</h2><p>Read the notification and corrigendum together before relying on recruitment dates, eligibility or scoring rules.</p><div class="hub-grid">${exam.sources.map(source => `<a class="hub-tile" href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.label)} ↗</a>`).join('')}</div></section>
+        <section class="hub-section" id="constable-syllabus"><h2>Subject and topic outline</h2><p>${escapeHtml(syllabus.note)}</p><div class="hub-grid">${syllabus.sections.map(section => `<article class="hub-tile"><h3>${escapeHtml(section.name)}</h3><ul>${section.topics.map(topic => `<li>${escapeHtml(topic)}</li>`).join('')}</ul></article>`).join('')}</div></section>
+        <section class="hub-section" id="constable-practice"><h2>Subject practice and sample mock</h2><p>Try short subject exercises or a mixed sample. A full official-pattern mock will appear after its questions and rules have been reviewed.</p><div class="test-list">${tests.map(test => testCard(test, results)).join('') || '<p>No practice tests are available yet.</p>'}</div></section>
+        <section class="hub-section" id="constable-settings"><h2>Choose your test mode</h2><p>Each test lets you choose a whole-test timer, a per-question timer or untimed practice. Check answers after each question or only after submission.</p><a class="primary-button" href="#/tests">Browse test settings →</a></section>
+        <section class="hub-section" id="constable-results"><h2>Results and retakes</h2><p>${latest ? `${results.length} attempt${results.length === 1 ? '' : 's'} · latest score ${latest.percent}%. ${weak ? `Suggested next focus: ${escapeHtml(weak)}.` : ''}` : 'Complete a practice test to see your score, explanations and topic analysis.'}</p>${latest ? `<a class="primary-button" href="#/result/${latest.id}">Review latest result →</a>` : '<a class="primary-button" href="#/tests">Start practising →</a>'}<p>On the result page, retake unanswered, unanswered and wrong, wrong only, or all questions with fresh shuffles.</p></section>
+        <section class="hub-section" id="constable-stages"><h2>Recruitment stages</h2><div class="hub-grid">${exam.stages.map((stage, index) => `<article class="hub-tile"><small>STAGE ${index + 1}</small><h3>${escapeHtml(stage.name)}</h3><p>${escapeHtml(stage.description)}</p></article>`).join('')}</div><p>For current criteria and schedules, use the official links above.</p></section>
+      </section>`;
+    document.querySelectorAll('[data-hub-section]').forEach(button => button.addEventListener('click', () => document.getElementById(button.dataset.hubSection)?.scrollIntoView({ behavior: 'smooth' })));
   }
 
   function testCard(test, results = TestEngine.getResults()) {
@@ -477,7 +516,7 @@
 
   function renderResult(id) {
     const result = TestEngine.getResults().find(item => item.id === id);
-    const test = state.tests.find(item => item.id === result?.testId);
+    const test = state.tests.find(item => item.id === result?.testId) || state.tests.find(item => item.id === result?.baseTestId);
     if (!result || !test) return notFound('Result not found');
     const circumference = 339.3;
     document.getElementById('app').innerHTML = `
@@ -494,18 +533,52 @@
           return `<div class="topic-row"><span><strong>${topic}</strong><small>${scores.correct}/${scores.total} correct</small></span><div><i style="width:${percent}%"></i></div><b>${percent}%</b></div>`;
         }).join('')}</article>
         <div class="result-actions"><a class="ghost-button" href="#/tests">More tests</a><a class="primary-button" href="#/review/${result.id}">Review answers →</a></div>
+        <section class="analysis-card"><h2>Retake questions</h2><p>Questions and options are reshuffled for each retake.</p><div class="result-actions retake-actions">${[['unanswered','Unanswered only'],['review','Unanswered + wrong'],['wrong','Wrong only'],['all','All questions']].map(([mode,label]) => `<button class="ghost-button" data-retake="${mode}" ${mode !== 'all' && !retakeQuestions(test, result, mode).length ? 'disabled' : ''}>${label} (${retakeQuestions(test, result, mode).length})</button>`).join('')}</div></section>
       </section>`;
+    document.querySelectorAll('[data-retake]').forEach(button => button.addEventListener('click', () => startRetake(test, result, button.dataset.retake)));
+  }
+
+  function retakeQuestions(test, result, mode) {
+    const questions = result.questions || test.questions;
+    return questions.filter((question, index) => {
+      const answer = result.answers[index];
+      return mode === 'all' || (mode === 'unanswered' && answer === null) || (mode === 'wrong' && answer !== null && answer !== question.correctOption) || (mode === 'review' && answer !== question.correctOption);
+    });
+  }
+
+  function shuffle(items) {
+    const copy = [...items];
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  }
+
+  function startRetake(test, result, mode) {
+    const selected = retakeQuestions(test, result, mode);
+    if (!selected.length) return;
+    const questions = shuffle(selected.map(question => {
+      const options = shuffle(question.options.map((option, index) => ({ option, index })));
+      return { ...question, options: options.map(item => item.option), correctOption: options.findIndex(item => item.index === question.correctOption) };
+    }));
+    const baseTestId = result.baseTestId || test.id;
+    const original = state.tests.find(item => item.id === baseTestId) || test;
+    const retake = { ...test, id: `${baseTestId}~${Date.now()}`, baseTestId, title: `${original.title} — retake`, questions, totalMarks: questions.reduce((sum, question) => sum + Number(question.marks || 1), 0), timing: { ...test.timing, totalSeconds: Math.max(60, Math.round(original.timing.totalSeconds * questions.length / original.questions.length)) } };
+    state.tests.push(retake);
+    sessionStorage.setItem('he_retake', JSON.stringify(retake));
+    location.hash = `#/instructions/${retake.id}`;
   }
 
   function renderReview(id) {
     const result = TestEngine.getResults().find(item => item.id === id);
-    const test = state.tests.find(item => item.id === result?.testId);
+    const test = state.tests.find(item => item.id === result?.testId) || state.tests.find(item => item.id === result?.baseTestId);
     if (!result || !test) return notFound('Review not found');
     document.getElementById('app').innerHTML = `
       <section class="page narrow">
         <a class="back-link" href="#/result/${result.id}">← Back to result</a>
         <div class="page-hero compact"><span class="eyebrow">ANSWER REVIEW</span><h1>${test.title}</h1><p>Compare your choices with the correct answers and explanations.</p></div>
-        <div class="review-list">${test.questions.map((question, index) => {
+        <div class="review-list">${(result.questions || test.questions).map((question, index) => {
           const selected = result.answers[index];
           const correct = selected === question.correctOption;
           return `<article class="review-card ${correct ? 'correct' : 'incorrect'}"><div class="review-number">${index + 1}</div><div><span class="tag-row"><i>${question.topic}</i><i>${correct ? 'Correct' : selected === null ? 'Not answered' : 'Incorrect'}</i></span><h3>${question.question}</h3><p><b>Your answer:</b> ${selected === null ? 'Not answered' : question.options[selected]}</p><p class="correct-text"><b>Correct answer:</b> ${question.options[question.correctOption]}</p><div class="explanation"><strong>Explanation</strong><p>${question.explanation}</p></div></div></article>`;
