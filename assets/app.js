@@ -62,6 +62,9 @@
       state.users = users.users || [];
       state.exams = exams.exams || [];
       state.tests = tests.tests || [];
+      const available = state.exams.find(exam => exam.available)?.id;
+      state.preferences.selected = (state.preferences.selected || []).filter(id => state.exams.some(exam => exam.id === id && exam.available));
+      if (!state.preferences.selected.includes(state.preferences.primary)) state.preferences.primary = available && state.preferences.selected.includes(available) ? available : null;
       applyBranding();
       bindShell();
       route();
@@ -208,7 +211,7 @@
   }
 
   function publicExamCard(exam) {
-    return `<article class="public-exam-card"><div class="public-exam-top"><span class="exam-icon">${icon(exam.icon)}</span><i>${exam.status}</i></div><h3>${exam.name}</h3><p>${exam.description}</p><dl><div><dt>Authority</dt><dd>${exam.authority}</dd></div><div><dt>Negative marking</dt><dd>${exam.negativeMarking || 'None'}</dd></div><div><dt>Subjects</dt><dd>${exam.subjects.length}</dd></div></dl><button type="button" data-public-exam="${exam.id}">Select this exam →</button></article>`;
+    return `<article class="public-exam-card"><div class="public-exam-top"><span class="exam-icon">${icon(exam.icon)}</span><i>${exam.available ? exam.status : 'Coming soon'}</i></div><h3>${exam.name}</h3><p>${exam.description}</p><dl><div><dt>Authority</dt><dd>${exam.authority}</dd></div><div><dt>Negative marking</dt><dd>${exam.negativeMarking || 'None'}</dd></div><div><dt>Subjects</dt><dd>${exam.subjects.length}</dd></div></dl>${exam.available ? `<button type="button" data-public-exam="${exam.id}">Select this exam →</button>` : '<span class="coming-soon-action">Coming soon</span>'}</article>`;
   }
 
   function renderLogin() {
@@ -253,7 +256,7 @@
       updateUserShell();
       document.body.classList.remove('auth-mode');
       const preselected = sessionStorage.getItem('he_preselected_exam');
-      if (preselected) {
+      if (preselected && state.exams.some(exam => exam.id === preselected && exam.available)) {
         state.preferences = { selected: [preselected], primary: preselected };
         sessionStorage.removeItem('he_preselected_exam');
       }
@@ -317,6 +320,7 @@
   }
 
   function examCard(exam, selected, primary) {
+    if (!exam.available) return `<div class="exam-select-card coming-soon-card" aria-disabled="true"><span class="exam-icon">${icon(exam.icon)}</span><span class="exam-card-copy"><strong>${exam.name}</strong><small>${exam.authority}</small><p>${exam.description}</p><span class="tag-row"><i>Coming soon</i></span></span></div>`;
     return `<button class="exam-select-card ${selected ? 'selected' : ''}" data-exam-select="${exam.id}" type="button">
       <span class="exam-icon">${icon(exam.icon)}</span>
       <span class="exam-card-copy"><strong>${exam.name}</strong><small>${exam.authority}</small><p>${exam.description}</p><span class="tag-row"><i>${exam.status}</i><i>${exam.negativeMarking ? `−${exam.negativeMarking} negative` : 'No negative marking'}</i></span></span>
