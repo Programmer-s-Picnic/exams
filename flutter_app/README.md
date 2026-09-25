@@ -6,10 +6,13 @@ Native Flutter client for Android and iOS.
 
 - Centralized JSON API client using `examsdata`
 - Student/demo login
-- Dashboard, examination goals and test catalogue
+- Website-parity Constable onboarding, dashboard and exam hub
+- Only UP Police Constable selectable; upcoming exams are clearly disabled
+- Official Constable sources, syllabus, recruitment stages and practice area
 - Total-test timed, per-question timed and untimed modes
 - Per-question or end-of-test feedback
-- Question review, scoring and result summary
+- Question review, negative marking, topic analysis and result summary
+- Shuffled retakes: unanswered, unanswered + wrong, wrong only, or all
 - Responsive Material 3 interface
 
 ## Demo login
