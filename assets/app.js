@@ -421,11 +421,14 @@
     const detail = manifest.fileDetails?.[file.path] || {};
     const usedAt = detail.usedAt || [];
     const keyGroups = Object.entries(detail.keys || {});
+    const relationships = (manifest.relationships || []).filter(item => item.from === file.path || item.to === file.path);
+    const relationshipSvg = '<svg class="detail-relation-arrow" viewBox="0 0 140 28" preserveAspectRatio="none" aria-hidden="true"><path d="M3 14h124"/><path d="m118 6 11 8-11 8"/><circle cx="4" cy="14" r="3"/></svg>';
     return `<section class="admin-file-info">
       <div><span>${adminInfoIcon('purpose')}Purpose</span><p>${escapeHtml(detail.purpose || 'Supporting project file.')}</p></div>
       <div><span>${adminInfoIcon('data')}Stored data</span><p>${escapeHtml(detail.storedData || 'Not applicable or not documented yet.')}</p></div>
       <div><span>${adminInfoIcon('format')}Format</span><p><code>${escapeHtml(detail.format || file.category)}</code></p></div>
       ${keyGroups.length ? `<div class="admin-key-info"><span>${adminInfoIcon('keys')}Keys and integrity</span>${keyGroups.map(([type, keys]) => `<section><b>${escapeHtml(type)}</b><ul>${keys.map(key => `<li><code>${escapeHtml(key)}</code></li>`).join('')}</ul></section>`).join('')}</div>` : ''}
+      ${relationships.length ? `<div class="admin-detail-relations"><span>${adminInfoIcon('link')}Relationships involving this file</span><div class="detail-relation-list">${relationships.map(relation => `<article class="detail-relation ${relation.from === file.path && relation.to === file.path ? 'self' : relation.from === file.path ? 'outgoing' : 'incoming'}"><div><small>${relation.from === file.path ? 'THIS FILE' : 'RELATED FILE'}</small><strong>${escapeHtml(relation.from)}</strong><code>${escapeHtml(relation.fromField)}</code></div><section><b>${escapeHtml(relation.cardinality)}</b>${relationshipSvg}<small>${escapeHtml(relation.label)}</small></section><div><small>${relation.to === file.path ? 'THIS FILE' : 'RELATED FILE'}</small><strong>${escapeHtml(relation.to)}</strong><code>${escapeHtml(relation.toField)}</code></div></article>`).join('')}</div></div>` : ''}
       <div class="admin-used-at"><span>${adminInfoIcon('link')}Used at</span>${usedAt.length ? `<ul>${usedAt.map(place => `<li><a href="${escapeHtml(place.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(place.label)}</a>${place.note ? `<small>${escapeHtml(place.note)}</small>` : ''}</li>`).join('')}</ul>` : '<p>Not currently connected to a public page; retained for future content.</p>'}</div>
     </section>`;
   }
