@@ -138,13 +138,13 @@
     TestEngine.stop();
     closeModal();
     const { name, id } = currentRoute();
-    const publicRoutes = ['landing', 'landing-exams', 'landing-how', 'login'];
+    const publicRoutes = ['landing', 'landing-exams', 'landing-how', 'login', 'admin'];
     if (!state.user && !publicRoutes.includes(name)) {
       sessionStorage.setItem('he_after_login', location.hash || '#/home');
       location.hash = '#/login';
       return;
     }
-    if (state.user && !state.preferences.primary && name !== 'onboarding' && name !== 'profile') {
+    if (state.user && !state.preferences.primary && !['onboarding', 'profile', 'admin'].includes(name)) {
       location.hash = '#/onboarding';
       return;
     }
@@ -157,6 +157,7 @@
       login: renderLogin,
       home: renderDashboard,
       constable: renderConstable,
+      admin: renderAdmin,
       onboarding: renderOnboarding,
       tests: renderTests,
       instructions: () => renderInstructions(id),
@@ -180,7 +181,7 @@
       const value = item.valueFrom === 'questionCount' ? `${questionCount}${item.suffix || ''}` : item.value;
       return `<div><strong>${value}</strong><span>${item.label}</span></div>`;
     }).join('');
-    const featuredTest = state.tests.find(test => test.id === 'common-foundation-diagnostic') || state.tests[0];
+    const featuredTest = state.tests.find(test => test.available) || state.tests[0];
     document.getElementById('app').innerHTML = `
       <div class="public-landing">
         <section class="verification-strip"><span>${verification.label}</span><p>${verification.message}</p><time>Checked ${formatDate(verification.lastChecked)}</time></section>
@@ -357,13 +358,13 @@
     document.body.classList.remove('auth-mode');
     const copy = state.config.content.dashboard;
     const primary = state.exams.find(exam => exam.id === state.preferences.primary);
-    const relevantTests = state.tests.filter(test => test.examIds.includes(state.preferences.primary));
+    const relevantTests = state.tests.filter(test => test.available && test.examIds.includes(state.preferences.primary));
     const results = TestEngine.getResults();
     const active = TestEngine.activeAttempt();
     const attempts = results.length;
     const average = attempts ? Math.round(results.reduce((sum, result) => sum + result.percent, 0) / attempts) : 0;
     const completedIds = new Set(results.map(result => result.testId));
-    const nextTest = relevantTests.find(test => !completedIds.has(test.id)) || relevantTests[0] || state.tests[0];
+    const nextTest = relevantTests.find(test => !completedIds.has(test.id)) || relevantTests[0];
     document.getElementById('app').innerHTML = `
       <section class="page dashboard">
         <div class="welcome-row"><div><span class="eyebrow">${copy.eyebrow}</span><h1>Good ${dayPart()}, ${escapeHtml(state.user.name.split(' ')[0])}</h1><p>${copy.description}</p></div><a class="ghost-button" href="#/onboarding">Change goal</a></div>
@@ -394,6 +395,51 @@
     focusCard.addEventListener('keydown', event => { if (event.target === focusCard && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); location.hash = '#/constable'; } });
   }
 
+  function jsonTree(value, key = null, depth = 0) {
+    const label = key === null ? '' : `<span class="json-key">${escapeHtml(key)}</span><span class="json-punctuation">: </span>`;
+    if (value === null) return `<div class="json-leaf">${label}<span class="json-null">null</span></div>`;
+    if (typeof value === 'string') return `<div class="json-leaf">${label}<span class="json-string">${escapeHtml(JSON.stringify(value))}</span></div>`;
+    if (typeof value !== 'object') return `<div class="json-leaf">${label}<span class="json-number">${escapeHtml(String(value))}</span></div>`;
+    const pairs = Array.isArray(value) ? value.map((item, index) => [String(index), item]) : Object.entries(value);
+    const kind = Array.isArray(value) ? 'Array' : 'Object';
+    return `<details class="json-node" ${depth < 2 ? 'open' : ''}><summary>${label}<span class="json-type">${kind} · ${pairs.length} ${pairs.length === 1 ? 'item' : 'items'}</span></summary><div class="json-children">${pairs.map(([childKey, item]) => jsonTree(item, childKey, depth + 1)).join('')}</div></details>`;
+  }
+
+  async function renderAdmin() {
+    const mount = document.getElementById('app');
+    mount.innerHTML = '<section class="page"><div class="loading-screen"><span class="loader"></span><p>Loading content inventory…</p></div></section>';
+    try {
+      const manifest = await Api.request('content-manifest.json');
+      if (location.hash !== '#/admin') return;
+      const groups = ['JSON', 'CSS', 'JavaScript', 'Images', 'HTML'];
+      mount.innerHTML = `<section class="page admin-page"><div class="page-hero"><span class="eyebrow">READ-ONLY CONTENT BROWSER</span><h1>Site admin · content inventory</h1><p>Browse published files and inspect JSON data. Changes must be made in the repositories.</p></div><div class="admin-layout"><aside class="admin-sidebar"><label class="admin-search">Find a file<input id="adminSearch" type="search" placeholder="Filter by name or path"></label><div id="adminFileList">${groups.map(group => `<section class="admin-file-group"><h2>${group} <small>${manifest.files.filter(file => file.category === group).length}</small></h2>${manifest.files.filter(file => file.category === group).map((file, index) => `<button type="button" data-admin-file="${manifest.files.indexOf(file)}" title="${escapeHtml(file.repository + '/' + file.path)}">${escapeHtml(file.path)}</button>`).join('')}</section>`).join('')}</div></aside><article class="admin-preview"><div id="adminViewer"><h2>Select a file</h2><p>${manifest.notes.map(escapeHtml).join(' ')}</p></div></article></div></section>`;
+      const fileList = document.getElementById('adminFileList');
+      document.getElementById('adminSearch').addEventListener('input', event => {
+        const query = event.target.value.trim().toLowerCase();
+        fileList.querySelectorAll('[data-admin-file]').forEach(button => { button.hidden = !`${manifest.files[Number(button.dataset.adminFile)].repository}/${button.textContent}`.toLowerCase().includes(query); });
+      });
+      fileList.addEventListener('click', async event => {
+        const button = event.target.closest('[data-admin-file]');
+        if (!button) return;
+        fileList.querySelectorAll('[data-admin-file]').forEach(item => item.classList.toggle('active', item === button));
+        const file = manifest.files[Number(button.dataset.adminFile)];
+        const viewer = document.getElementById('adminViewer');
+        viewer.innerHTML = '<div class="loading-screen"><span class="loader"></span><p>Loading file…</p></div>';
+        try {
+          const source = file.repository === 'examsdata' ? file.path : file.url;
+          const isJson = file.category === 'JSON';
+          const content = file.category === 'Images' ? null : await Api.request(source, isJson ? {} : { responseType: 'text' });
+          viewer.innerHTML = `<div class="admin-viewer-head"><div><span class="eyebrow">${escapeHtml(file.category)} · ${escapeHtml(file.repository)}</span><h2>${escapeHtml(file.path)}</h2></div><a class="ghost-button" href="${escapeHtml(file.url)}" target="_blank" rel="noopener noreferrer">Open file ↗</a></div>${isJson ? `<div class="admin-toolbar"><button type="button" id="adminTree" class="active">Tree view</button><button type="button" id="adminRaw">Formatted JSON</button><button type="button" id="adminCopy">Copy JSON</button></div><div id="adminJsonTree" class="json-viewer">${jsonTree(content)}</div><pre id="adminJsonRaw" class="admin-code" hidden><code>${escapeHtml(JSON.stringify(content, null, 2))}</code></pre>` : file.category === 'Images' ? `<div class="admin-image"><img src="${escapeHtml(file.url)}" alt="${escapeHtml(file.path)}" loading="lazy"></div>` : `<pre class="admin-code"><code>${escapeHtml(content)}</code></pre>`}`;
+          if (isJson) {
+            document.getElementById('adminTree').onclick = () => { document.getElementById('adminJsonTree').hidden = false; document.getElementById('adminJsonRaw').hidden = true; };
+            document.getElementById('adminRaw').onclick = () => { document.getElementById('adminJsonTree').hidden = true; document.getElementById('adminJsonRaw').hidden = false; };
+            document.getElementById('adminCopy').onclick = async () => { await navigator.clipboard.writeText(JSON.stringify(content, null, 2)); toast('JSON copied.'); };
+          }
+        } catch (error) { viewer.innerHTML = `<div class="error-state"><h2>File could not be loaded</h2><p>${escapeHtml(error.message)}</p><a href="${escapeHtml(file.url)}" target="_blank" rel="noopener noreferrer">Open original file ↗</a></div>`; }
+      });
+    } catch (error) { mount.innerHTML = `<section class="page"><div class="error-state"><h1>Content inventory unavailable</h1><p>${escapeHtml(error.message)}</p></div></section>`; }
+  }
+
   function renderConstable() {
     const exam = state.exams.find(item => item.id === 'up-police');
     const syllabus = state.syllabus.find(item => item.examId === exam?.id);
@@ -407,7 +453,7 @@
         <a class="back-link" href="#/home">← Dashboard</a>
         <div class="page-hero"><span class="eyebrow">YOUR EXAM</span><h1>${escapeHtml(exam.name)}</h1><p>${escapeHtml(exam.description)}</p><small>Sources checked ${escapeHtml(exam.verifiedAt)} · Preparation content is independent of the recruitment board.</small></div>
         <nav class="hub-nav" aria-label="Constable sections">${[['overview','Overview'],['syllabus','Syllabus'],['practice','Practice'],['settings','Test modes'],['results','Results'],['stages','Stages']].map(([id,label]) => `<button type="button" data-hub-section="constable-${id}">${label}</button>`).join('')}</nav>
-        <section class="hub-section" id="constable-overview"><h2>Exam overview and official sources</h2><p>Read the notification and corrigendum together before relying on recruitment dates, eligibility or scoring rules.</p><div class="hub-grid">${exam.sources.map(source => `<a class="hub-tile" href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.label)} ↗</a>`).join('')}</div></section>
+        <section class="hub-section" id="constable-overview"><h2>Exam overview and official documents</h2><p>Read the notification and corrigendum together before relying on recruitment dates, eligibility or scoring rules. Select a document to view it below.</p><div class="hub-grid">${exam.sources.map((source, index) => `<div class="hub-tile"><strong>${escapeHtml(source.label)}</strong><div class="document-actions"><button class="ghost-button" type="button" data-document="${index}">View here</button><a class="ghost-button" href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">Open original ↗</a></div></div>`).join('')}</div><div id="officialDocument" class="document-frame" hidden><div class="document-heading"><strong id="documentTitle"></strong><a id="documentOriginal" href="#" target="_blank" rel="noopener noreferrer">Open original ↗</a></div><iframe id="documentIframe" title="Official Constable document" loading="lazy" referrerpolicy="no-referrer"></iframe><p>Preview unavailable? Use “Open original” above. Official websites can prevent embedding.</p></div></section>
         <section class="hub-section" id="constable-syllabus"><h2>Subject and topic outline</h2><p>${escapeHtml(syllabus.note)}</p><div class="hub-grid">${syllabus.sections.map(section => `<article class="hub-tile"><h3>${escapeHtml(section.name)}</h3><ul>${section.topics.map(topic => `<li>${escapeHtml(topic)}</li>`).join('')}</ul></article>`).join('')}</div></section>
         <section class="hub-section" id="constable-practice"><h2>Subject practice and sample mock</h2><p>Try short subject exercises or a mixed sample. A full official-pattern mock will appear after its questions and rules have been reviewed.</p><div class="test-list">${tests.map(test => testCard(test, results)).join('') || '<p>No practice tests are available yet.</p>'}</div></section>
         <section class="hub-section" id="constable-settings"><h2>Choose your test mode</h2><p>Each test lets you choose a whole-test timer, a per-question timer or untimed practice. Check answers after each question or only after submission.</p><a class="primary-button" href="#/tests">Browse test settings →</a></section>
@@ -415,6 +461,15 @@
         <section class="hub-section" id="constable-stages"><h2>Recruitment stages</h2><div class="hub-grid">${exam.stages.map((stage, index) => `<article class="hub-tile"><small>STAGE ${index + 1}</small><h3>${escapeHtml(stage.name)}</h3><p>${escapeHtml(stage.description)}</p></article>`).join('')}</div><p>For current criteria and schedules, use the official links above.</p></section>
       </section>`;
     document.querySelectorAll('[data-hub-section]').forEach(button => button.addEventListener('click', () => document.getElementById(button.dataset.hubSection)?.scrollIntoView({ behavior: 'smooth' })));
+    document.querySelectorAll('[data-document]').forEach(button => button.addEventListener('click', () => {
+      const source = exam.sources[Number(button.dataset.document)];
+      if (!source || !/^https:\/\/uppbpb\.gov\.in\//.test(source.url)) return;
+      document.getElementById('documentTitle').textContent = source.label;
+      document.getElementById('documentOriginal').href = source.url;
+      document.getElementById('documentIframe').src = source.url;
+      document.getElementById('officialDocument').hidden = false;
+      document.getElementById('officialDocument').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }));
   }
 
   function testCard(test, results = TestEngine.getResults()) {
@@ -422,7 +477,7 @@
     return `<article class="test-card">
       <div class="test-card-icon">${icon(test.icon || 'test')}</div>
       <div class="test-card-copy"><span class="tag-row"><i>${test.difficulty}</i><i>${test.category}</i></span><h3>${test.title}</h3><p>${test.description}</p><div class="test-facts"><span><b>${test.questions.length}</b> questions</span><span><b>${Math.round(test.timing.totalSeconds / 60)}</b> minutes</span><span><b>${test.totalMarks}</b> marks</span><span><b>${test.negativeMarking || 0}</b> negative</span></div></div>
-      <div class="test-card-action">${previous ? `<span class="previous-score">${previous.percent}%<small>Latest score</small></span>` : '<span class="new-label">Not attempted</span>'}<a class="primary-button" href="#/instructions/${test.id}">${previous ? 'Try again' : 'View test'} →</a></div>
+      <div class="test-card-action">${test.available ? `${previous ? `<span class="previous-score">${previous.percent}%<small>Latest score</small></span>` : '<span class="new-label">Not attempted</span>'}<a class="primary-button" href="#/instructions/${test.id}">${previous ? 'Try again' : 'View test'} →</a>` : '<span class="coming-soon-action">Coming soon</span>'}</div>
     </article>`;
   }
 
@@ -432,7 +487,7 @@
         <div class="page-hero compact"><span class="eyebrow">PRACTICE LIBRARY</span><h1>Choose your next test</h1><p>Use focused practice to find gaps before the real examination does.</p></div>
         <div class="filter-bar">
           <label class="search-box">⌕<input id="testSearch" placeholder="Search tests" value="${escapeHtml(state.filters.query)}"></label>
-          <select id="examFilter"><option value="all">All examinations</option>${state.exams.map(exam => `<option value="${exam.id}" ${state.filters.exam === exam.id ? 'selected' : ''}>${exam.name}</option>`).join('')}</select>
+          <select id="examFilter"><option value="all">All examinations</option>${state.exams.filter(exam => exam.available).map(exam => `<option value="${exam.id}" ${state.filters.exam === exam.id ? 'selected' : ''}>${exam.name}</option>`).join('')}</select>
           <select id="statusFilter"><option value="all">All attempts</option><option value="new" ${state.filters.status === 'new' ? 'selected' : ''}>Not attempted</option><option value="completed" ${state.filters.status === 'completed' ? 'selected' : ''}>Completed</option></select>
         </div>
         <div class="test-list" id="testList">${filteredTests().map(test => testCard(test)).join('') || '<div class="empty-state"><h3>No tests found</h3><p>Try changing the filters.</p></div>'}</div>
@@ -456,7 +511,7 @@
 
   function renderInstructions(id) {
     const test = state.tests.find(item => item.id === id);
-    if (!test) return notFound('Test not found');
+    if (!test || !test.available) return notFound('This test is coming soon');
     document.getElementById('app').innerHTML = `
       <section class="page narrow">
         <a class="back-link" href="#/tests">← Back to tests</a>
@@ -497,7 +552,7 @@
 
   function beginAttempt(id) {
     const test = state.tests.find(item => item.id === id);
-    if (!test) return notFound('Test not found');
+    if (!test || !test.available) return notFound('This test is coming soon');
     const saved = TestEngine.activeAttempt();
     const settings = readSession('he_test_settings') || {};
     TestEngine.start(test, { ...settings, sound: state.sound }, saved?.testId === id ? saved : null);
