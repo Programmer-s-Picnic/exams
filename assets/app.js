@@ -408,12 +408,26 @@
   function adminFileInfo(file, manifest) {
     const detail = manifest.fileDetails?.[file.path] || {};
     const usedAt = detail.usedAt || [];
+    const keyGroups = Object.entries(detail.keys || {});
     return `<section class="admin-file-info">
       <div><span>Purpose</span><p>${escapeHtml(detail.purpose || 'Supporting project file.')}</p></div>
       <div><span>Stored data</span><p>${escapeHtml(detail.storedData || 'Not applicable or not documented yet.')}</p></div>
       <div><span>Format</span><p><code>${escapeHtml(detail.format || file.category)}</code></p></div>
+      ${keyGroups.length ? `<div class="admin-key-info"><span>Keys and integrity</span>${keyGroups.map(([type, keys]) => `<section><b>${escapeHtml(type)}</b><ul>${keys.map(key => `<li><code>${escapeHtml(key)}</code></li>`).join('')}</ul></section>`).join('')}</div>` : ''}
       <div class="admin-used-at"><span>Used at</span>${usedAt.length ? `<ul>${usedAt.map(place => `<li><a href="${escapeHtml(place.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(place.label)}</a>${place.note ? `<small>${escapeHtml(place.note)}</small>` : ''}</li>`).join('')}</ul>` : '<p>Not currently connected to a public page; retained for future content.</p>'}</div>
     </section>`;
+  }
+
+  function adminDataMap(manifest) {
+    const jsonFiles = manifest.files.filter(file => file.category === 'JSON');
+    const nodes = jsonFiles.map(file => {
+      const detail = manifest.fileDetails?.[file.path] || {};
+      const primary = detail.keys?.primary?.[0] || detail.keys?.configuration?.[0] || 'No relational key';
+      const foreignCount = detail.keys?.foreign?.length || 0;
+      return `<button type="button" class="data-node" data-model-file="${manifest.files.indexOf(file)}"><strong>${escapeHtml(file.path)}</strong><span><b>PK</b> ${escapeHtml(primary)}</span><small>${foreignCount} foreign key${foreignCount === 1 ? '' : 's'} · ${(detail.usedAt || []).length} usage link${(detail.usedAt || []).length === 1 ? '' : 's'}</small></button>`;
+    }).join('');
+    const relations = (manifest.relationships || []).map(relation => `<article class="relationship-edge"><div><strong>${escapeHtml(relation.from)}</strong><code>${escapeHtml(relation.fromField)}</code></div><span><b>${escapeHtml(relation.cardinality)}</b>→<small>${escapeHtml(relation.label)}</small></span><div><strong>${escapeHtml(relation.to)}</strong><code>${escapeHtml(relation.toField)}</code></div></article>`).join('');
+    return `<section class="data-model"><div class="section-heading"><div><span class="eyebrow">JSON DATA MODEL</span><h2>Files, keys and relationships</h2><p>Click a file to inspect its schema, stored data and consumer pages.</p></div></div><div class="data-node-grid">${nodes}</div><details class="relationship-list" open><summary>Relationship graph · ${(manifest.relationships || []).length} links</summary>${relations}</details><div class="data-legend"><span><b>PK</b> Primary key</span><span><b>FK</b> Foreign key</span><span><b>1→N</b> One-to-many</span><span><b>N↔N</b> Many-to-many</span></div></section>`;
   }
 
   async function renderAdmin() {
@@ -423,7 +437,7 @@
       const manifest = await Api.request('content-manifest.json');
       if (location.hash !== '#/admin') return;
       const groups = ['JSON', 'CSS', 'JavaScript', 'Images', 'HTML'];
-      mount.innerHTML = `<section class="page admin-page"><div class="page-hero"><span class="eyebrow">READ-ONLY CONTENT BROWSER</span><h1>Site admin · content inventory</h1><p>Browse published files, understand what they store, and see exactly where they are used. These files are public; this page does not provide secure admin access or editing.</p></div><div class="admin-layout"><aside class="admin-sidebar"><label class="admin-search">Find a file<input id="adminSearch" type="search" placeholder="Name, data, purpose or page"></label><div id="adminFileList">${groups.map(group => `<section class="admin-file-group"><h2>${group} <small>${manifest.files.filter(file => file.category === group).length}</small></h2>${manifest.files.filter(file => file.category === group).map(file => { const detail = manifest.fileDetails?.[file.path] || {}; return `<button type="button" data-admin-file="${manifest.files.indexOf(file)}" title="${escapeHtml(file.repository + '/' + file.path)}"><strong>${escapeHtml(file.path)}</strong>${detail.storedData ? `<small>${escapeHtml(detail.storedData)}</small>` : ''}</button>`; }).join('')}</section>`).join('')}</div></aside><article class="admin-preview"><div id="adminViewer"><h2>Select a file</h2><p>${manifest.notes.map(escapeHtml).join(' ')}</p></div></article></div></section>`;
+      mount.innerHTML = `<section class="page admin-page"><div class="page-hero"><span class="eyebrow">READ-ONLY CONTENT BROWSER</span><h1>Site admin · content inventory</h1><p>Browse published files, understand what they store, and see exactly where they are used. These files are public; this page does not provide secure admin access or editing.</p></div>${adminDataMap(manifest)}<div class="admin-layout"><aside class="admin-sidebar"><label class="admin-search">Find a file<input id="adminSearch" type="search" placeholder="Name, data, purpose or page"></label><div id="adminFileList">${groups.map(group => `<section class="admin-file-group"><h2>${group} <small>${manifest.files.filter(file => file.category === group).length}</small></h2>${manifest.files.filter(file => file.category === group).map(file => { const detail = manifest.fileDetails?.[file.path] || {}; return `<button type="button" data-admin-file="${manifest.files.indexOf(file)}" title="${escapeHtml(file.repository + '/' + file.path)}"><strong>${escapeHtml(file.path)}</strong>${detail.storedData ? `<small>${escapeHtml(detail.storedData)}</small>` : ''}</button>`; }).join('')}</section>`).join('')}</div></aside><article class="admin-preview"><div id="adminViewer"><h2>Select a file</h2><p>${manifest.notes.map(escapeHtml).join(' ')}</p></div></article></div></section>`;
       const fileList = document.getElementById('adminFileList');
       document.getElementById('adminSearch').addEventListener('input', event => {
         const query = event.target.value.trim().toLowerCase();
@@ -448,6 +462,10 @@
           }
         } catch (error) { viewer.innerHTML = `<div class="error-state"><h2>File could not be loaded</h2><p>${escapeHtml(error.message)}</p><a href="${escapeHtml(file.url)}" target="_blank" rel="noopener noreferrer">Open original file ↗</a></div>`; }
       });
+      mount.querySelectorAll('[data-model-file]').forEach(node => node.addEventListener('click', () => {
+        const button = fileList.querySelector(`[data-admin-file="${node.dataset.modelFile}"]`);
+        if (button) { button.hidden = false; button.click(); document.querySelector('.admin-layout').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      }));
     } catch (error) { mount.innerHTML = `<section class="page"><div class="error-state"><h1>Content inventory unavailable</h1><p>${escapeHtml(error.message)}</p></div></section>`; }
   }
 
