@@ -405,6 +405,17 @@
     return `<details class="json-node" ${depth < 2 ? 'open' : ''}><summary>${label}<span class="json-type">${kind} · ${pairs.length} ${pairs.length === 1 ? 'item' : 'items'}</span></summary><div class="json-children">${pairs.map(([childKey, item]) => jsonTree(item, childKey, depth + 1)).join('')}</div></details>`;
   }
 
+  function adminFileInfo(file, manifest) {
+    const detail = manifest.fileDetails?.[file.path] || {};
+    const usedAt = detail.usedAt || [];
+    return `<section class="admin-file-info">
+      <div><span>Purpose</span><p>${escapeHtml(detail.purpose || 'Supporting project file.')}</p></div>
+      <div><span>Stored data</span><p>${escapeHtml(detail.storedData || 'Not applicable or not documented yet.')}</p></div>
+      <div><span>Format</span><p><code>${escapeHtml(detail.format || file.category)}</code></p></div>
+      <div class="admin-used-at"><span>Used at</span>${usedAt.length ? `<ul>${usedAt.map(place => `<li><a href="${escapeHtml(place.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(place.label)}</a>${place.note ? `<small>${escapeHtml(place.note)}</small>` : ''}</li>`).join('')}</ul>` : '<p>Not currently connected to a public page; retained for future content.</p>'}</div>
+    </section>`;
+  }
+
   async function renderAdmin() {
     const mount = document.getElementById('app');
     mount.innerHTML = '<section class="page"><div class="loading-screen"><span class="loader"></span><p>Loading content inventory…</p></div></section>';
@@ -412,11 +423,11 @@
       const manifest = await Api.request('content-manifest.json');
       if (location.hash !== '#/admin') return;
       const groups = ['JSON', 'CSS', 'JavaScript', 'Images', 'HTML'];
-      mount.innerHTML = `<section class="page admin-page"><div class="page-hero"><span class="eyebrow">READ-ONLY CONTENT BROWSER</span><h1>Site admin · content inventory</h1><p>Browse published files and inspect JSON data. These files are public; this page does not provide secure admin access or editing. Changes must be made in the repositories.</p></div><div class="admin-layout"><aside class="admin-sidebar"><label class="admin-search">Find a file<input id="adminSearch" type="search" placeholder="Filter by name or path"></label><div id="adminFileList">${groups.map(group => `<section class="admin-file-group"><h2>${group} <small>${manifest.files.filter(file => file.category === group).length}</small></h2>${manifest.files.filter(file => file.category === group).map(file => `<button type="button" data-admin-file="${manifest.files.indexOf(file)}" title="${escapeHtml(file.repository + '/' + file.path)}">${escapeHtml(file.path)}</button>`).join('')}</section>`).join('')}</div></aside><article class="admin-preview"><div id="adminViewer"><h2>Select a file</h2><p>${manifest.notes.map(escapeHtml).join(' ')}</p></div></article></div></section>`;
+      mount.innerHTML = `<section class="page admin-page"><div class="page-hero"><span class="eyebrow">READ-ONLY CONTENT BROWSER</span><h1>Site admin · content inventory</h1><p>Browse published files, understand what they store, and see exactly where they are used. These files are public; this page does not provide secure admin access or editing.</p></div><div class="admin-layout"><aside class="admin-sidebar"><label class="admin-search">Find a file<input id="adminSearch" type="search" placeholder="Name, data, purpose or page"></label><div id="adminFileList">${groups.map(group => `<section class="admin-file-group"><h2>${group} <small>${manifest.files.filter(file => file.category === group).length}</small></h2>${manifest.files.filter(file => file.category === group).map(file => { const detail = manifest.fileDetails?.[file.path] || {}; return `<button type="button" data-admin-file="${manifest.files.indexOf(file)}" title="${escapeHtml(file.repository + '/' + file.path)}"><strong>${escapeHtml(file.path)}</strong>${detail.storedData ? `<small>${escapeHtml(detail.storedData)}</small>` : ''}</button>`; }).join('')}</section>`).join('')}</div></aside><article class="admin-preview"><div id="adminViewer"><h2>Select a file</h2><p>${manifest.notes.map(escapeHtml).join(' ')}</p></div></article></div></section>`;
       const fileList = document.getElementById('adminFileList');
       document.getElementById('adminSearch').addEventListener('input', event => {
         const query = event.target.value.trim().toLowerCase();
-        fileList.querySelectorAll('[data-admin-file]').forEach(button => { button.hidden = !`${manifest.files[Number(button.dataset.adminFile)].repository}/${button.textContent}`.toLowerCase().includes(query); });
+        fileList.querySelectorAll('[data-admin-file]').forEach(button => { const file = manifest.files[Number(button.dataset.adminFile)]; const detail = manifest.fileDetails?.[file.path] || {}; button.hidden = !`${file.repository} ${file.path} ${detail.purpose || ''} ${detail.storedData || ''} ${(detail.usedAt || []).map(item => item.label).join(' ')}`.toLowerCase().includes(query); });
       });
       fileList.addEventListener('click', async event => {
         const button = event.target.closest('[data-admin-file]');
@@ -429,7 +440,7 @@
           const source = file.repository === 'examsdata' ? file.path : file.url;
           const isJson = file.category === 'JSON';
           const content = file.category === 'Images' ? null : await Api.request(source, isJson ? {} : { responseType: 'text' });
-          viewer.innerHTML = `<div class="admin-viewer-head"><div><span class="eyebrow">${escapeHtml(file.category)} · ${escapeHtml(file.repository)}</span><h2>${escapeHtml(file.path)}</h2></div><a class="ghost-button" href="${escapeHtml(file.url)}" target="_blank" rel="noopener noreferrer">Open file ↗</a></div>${isJson ? `<div class="admin-toolbar"><button type="button" id="adminTree" class="active">Tree view</button><button type="button" id="adminRaw">Formatted JSON</button><button type="button" id="adminCopy">Copy JSON</button></div><div id="adminJsonTree" class="json-viewer">${jsonTree(content)}</div><pre id="adminJsonRaw" class="admin-code" hidden><code>${escapeHtml(JSON.stringify(content, null, 2))}</code></pre>` : file.category === 'Images' ? `<div class="admin-image"><img src="${escapeHtml(file.url)}" alt="${escapeHtml(file.path)}" loading="lazy"></div>` : `<pre class="admin-code"><code>${escapeHtml(content)}</code></pre>`}`;
+          viewer.innerHTML = `<div class="admin-viewer-head"><div><span class="eyebrow">${escapeHtml(file.category)} · ${escapeHtml(file.repository)}</span><h2>${escapeHtml(file.path)}</h2></div><a class="ghost-button" href="${escapeHtml(file.url)}" target="_blank" rel="noopener noreferrer">Open file ↗</a></div>${adminFileInfo(file, manifest)}${isJson ? `<div class="admin-toolbar"><button type="button" id="adminTree" class="active">Tree view</button><button type="button" id="adminRaw">Formatted JSON</button><button type="button" id="adminCopy">Copy JSON</button></div><div id="adminJsonTree" class="json-viewer">${jsonTree(content)}</div><pre id="adminJsonRaw" class="admin-code" hidden><code>${escapeHtml(JSON.stringify(content, null, 2))}</code></pre>` : file.category === 'Images' ? `<div class="admin-image"><img src="${escapeHtml(file.url)}" alt="${escapeHtml(file.path)}" loading="lazy"></div>` : `<pre class="admin-code"><code>${escapeHtml(content)}</code></pre>`}`;
           if (isJson) {
             document.getElementById('adminTree').onclick = () => { document.getElementById('adminJsonTree').hidden = false; document.getElementById('adminJsonRaw').hidden = true; };
             document.getElementById('adminRaw').onclick = () => { document.getElementById('adminJsonTree').hidden = true; document.getElementById('adminJsonRaw').hidden = false; };
