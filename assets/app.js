@@ -11,7 +11,7 @@
     tests: [],
     syllabus: [],
     user: null,
-    preferences: read(KEYS.preferences) || { selected: [], primary: null },
+    preferences: { selected: [], primary: null },
     sound: read(KEYS.sound) !== false,
     filters: { query: '', exam: 'all', status: 'all' }
   };
@@ -19,7 +19,13 @@
   function read(key) {
     try { return JSON.parse(localStorage.getItem(key)); } catch (_) { return null; }
   }
-  function write(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+  function write(key, value) { localStorage.setItem(key === KEYS.preferences ? `${key}_${state.user.id}` : key, JSON.stringify(value)); }
+  function useAccount(user) {
+    state.user = user;
+    TestEngine.setUser(user?.id);
+    state.preferences = user ? read(`${KEYS.preferences}_${user.id}`) || { selected: [], primary: null } : { selected: [], primary: null };
+  }
+  TestEngine.setUser(null);
   function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
   }
@@ -27,7 +33,7 @@
   function saveAuth(result, remember) {
     sessionStorage.removeItem('he_auth_token'); localStorage.removeItem('he_auth_token');
     (remember ? localStorage : sessionStorage).setItem('he_auth_token', result.token);
-    state.user = result.user;
+    useAccount(result.user);
     updateUserShell();
   }
   function icon(name) {
@@ -62,7 +68,7 @@
       ]);
       state.config = config;
       if (authToken()) {
-        try { state.user = (await Api.auth('me', undefined, authToken())).user; }
+        try { useAccount((await Api.auth('me', undefined, authToken())).user); }
         catch (_) { sessionStorage.removeItem('he_auth_token'); localStorage.removeItem('he_auth_token'); }
       }
       state.exams = exams.exams || [];
@@ -813,7 +819,7 @@
       try { await Api.auth('logout', {}, authToken()); }
       catch (error) { toast('Could not sign out: ' + error.message); event.currentTarget.disabled = false; return; }
       sessionStorage.removeItem('he_auth_token'); localStorage.removeItem('he_auth_token');
-      localStorage.removeItem(KEYS.user); state.user = null; updateUserShell(); location.hash = '#/login';
+      localStorage.removeItem(KEYS.user); useAccount(null); updateUserShell(); location.hash = '#/login';
     });
   }
 
