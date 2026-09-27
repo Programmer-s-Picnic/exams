@@ -76,10 +76,11 @@
   function start(test, settings = {}, saved = null) {
     clearInterval(timerId);
     state.test = test;
-    state.markingMode = saved?.markingMode || settings.markingMode || 'default';
-    state.marking = saved?.marking || settings.marking || test.marking || { correct: null, incorrect: -Number(test.negativeMarking || 0), unanswered: 0 };
-    state.mode = settings.mode || test.defaultMode || 'total-timed';
-    state.feedbackMode = settings.feedbackMode || test.feedbackMode || 'on-completion';
+    const diagnostic = test.type === 'diagnostic';
+    state.markingMode = diagnostic ? 'default' : saved?.markingMode || settings.markingMode || 'default';
+    state.marking = diagnostic ? { ...test.marking } : saved?.marking || settings.marking || test.marking || { correct: null, incorrect: -Number(test.negativeMarking || 0), unanswered: 0 };
+    state.mode = diagnostic ? 'total-timed' : settings.mode || test.defaultMode || 'total-timed';
+    state.feedbackMode = diagnostic ? 'on-completion' : settings.feedbackMode || test.feedbackMode || 'on-completion';
     state.sound = settings.sound !== false;
     state.current = saved?.current || 0;
     state.answers = saved?.answers || Array(test.questions.length).fill(null);
@@ -87,9 +88,11 @@
     state.review = saved?.review || Array(test.questions.length).fill(false);
     state.startedAt = saved?.startedAt || Date.now();
     state.elapsedSeconds = saved?.elapsedSeconds || 0;
-    state.totalEndsAt = saved?.totalEndsAt || (state.mode === 'total-timed'
-      ? Date.now() + Number(test.timing.totalSeconds) * 1000
-      : null);
+    state.totalEndsAt = diagnostic
+      ? state.startedAt + Number(test.timing.totalSeconds) * 1000
+      : saved?.totalEndsAt || (state.mode === 'total-timed'
+        ? Date.now() + Number(test.timing.totalSeconds) * 1000
+        : null);
     state.questionEndsAt = saved?.questionEndsAt || null;
     open(state.current, Boolean(saved));
     tone(760);
