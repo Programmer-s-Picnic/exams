@@ -51,6 +51,9 @@
     if (!state.test) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       testId: state.test.id,
+      type: state.test.type || 'practice',
+      examId: state.test.examId || state.test.examIds?.[0] || null,
+      paperVersion: state.test.paperVersion || null,
       current: state.current,
       answers: state.answers,
       checked: state.checked,
@@ -272,6 +275,9 @@
     const result = {
       id: `result-${Date.now()}`,
       testId: state.test.id,
+      type: state.test.type || 'practice',
+      examId: state.test.examId || state.test.examIds?.[0] || null,
+      paperVersion: state.test.paperVersion || null,
       baseTestId: state.test.baseTestId || state.test.id,
       title: state.test.title,
       questions: state.test.questions,

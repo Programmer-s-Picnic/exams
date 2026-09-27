@@ -138,13 +138,14 @@
     TestEngine.stop();
     closeModal();
     const { name, id } = currentRoute();
-    const publicRoutes = ['landing', 'landing-exams', 'landing-how', 'login', 'admin'];
-    if (!state.user && !publicRoutes.includes(name)) {
+    const publicRoutes = ['landing', 'landing-exams', 'landing-how', 'login', 'admin', 'diagnostic'];
+    const publicDiagnostic = (['instructions', 'attempt'].includes(name) && state.tests.some(test => test.id === id && test.type === 'diagnostic')) || (['result', 'review'].includes(name) && TestEngine.getResults().some(result => result.id === id && result.type === 'diagnostic'));
+    if (!state.user && !publicRoutes.includes(name) && !publicDiagnostic) {
       sessionStorage.setItem('he_after_login', location.hash || '#/home');
       location.hash = '#/login';
       return;
     }
-    if (state.user && !state.preferences.primary && !['onboarding', 'profile', 'admin'].includes(name)) {
+    if (state.user && !state.preferences.primary && !['onboarding', 'profile', 'admin', 'diagnostic'].includes(name) && !publicDiagnostic) {
       location.hash = '#/onboarding';
       return;
     }
@@ -160,6 +161,7 @@
       admin: renderAdmin,
       onboarding: renderOnboarding,
       tests: renderTests,
+      diagnostic: renderDiagnosticSelection,
       instructions: () => renderInstructions(id),
       attempt: () => beginAttempt(id),
       results: renderResults,
@@ -191,7 +193,7 @@
             <span class="landing-badge">◆ ${content.badge}</span>
             <h1>${content.titleBefore}<br><em>${content.titleHighlight}</em></h1>
             <p>${content.description}</p>
-            <div class="landing-actions"><a class="mint-button" href="${content.primaryAction.route}">▶ ${content.primaryAction.label}</a><a class="dark-button" href="${content.secondaryAction.route}">${content.secondaryAction.label} →</a></div>
+            <div class="landing-actions"><a class="mint-button" href="#/diagnostic">Take Free Diagnostic Test →</a><a class="dark-button" href="${content.primaryAction.route}">${content.primaryAction.label} →</a></div>
             <div class="capability-grid">${capabilities}</div>
           </div>
         </section>
@@ -202,7 +204,7 @@
         <section class="landing-section diagnostic-section">
           <article class="diagnostic-panel">
             <div><span class="landing-eyebrow">${content.diagnostic.eyebrow}</span><h2>${content.diagnostic.title}</h2><p>${content.diagnostic.description}</p><div class="diagnostic-facts">${content.diagnostic.facts.map(fact => `<span>✓ ${fact}</span>`).join('')}</div></div>
-            <div class="diagnostic-preview"><span class="preview-label">${featuredTest.category}</span><h3>${featuredTest.title}</h3><div><b>${featuredTest.questions.length}</b><small>Questions</small></div><div><b>${Math.round(featuredTest.timing.totalSeconds / 60)}</b><small>Minutes</small></div><a class="mint-button" href="#/login">${content.diagnostic.actionLabel} →</a></div>
+            <div class="diagnostic-preview"><span class="preview-label">${featuredTest.category}</span><h3>${featuredTest.title}</h3><div><b>${featuredTest.questions.length}</b><small>Questions</small></div><div><b>${Math.round(featuredTest.timing.totalSeconds / 60)}</b><small>Minutes</small></div><a class="mint-button" href="#/diagnostic">${content.diagnostic.actionLabel} →</a></div>
           </article>
         </section>
         <section class="landing-section" id="landingHow">
@@ -373,6 +375,7 @@
           <div class="progress-ring" style="--progress:${average}"><span><strong>${average}%</strong><small>average</small></span></div>
           <a class="primary-button" href="#/constable">Open Constable exam →</a>
         </article>
+        <a class="diagnostic-banner" href="#/diagnostic"><strong>Take Free Diagnostic Test</strong><span>Select one exam and get a subject-wise report with preparation priorities →</span></a>
         ${active ? `<article class="resume-banner"><div><span class="eyebrow">SAVED ATTEMPT</span><h3>${state.tests.find(test => test.id === active.testId)?.title || 'Your test'}</h3><p>Question ${active.current + 1} · Your answers are safely stored.</p></div><a class="primary-button" href="#/attempt/${active.testId}">Resume test</a></article>` : ''}
         <div class="metrics-grid">
           <article><span class="metric-icon blue">${icon('test')}</span><strong>${attempts}</strong><small>Tests attempted</small></article>
@@ -556,9 +559,58 @@
   }
   function refreshTestList() { document.getElementById('testList').innerHTML = filteredTests().map(test => testCard(test)).join('') || '<div class="empty-state"><h3>No tests found</h3><p>Try changing the filters.</p></div>'; }
 
+  function renderDiagnosticSelection() {
+    document.getElementById('app').innerHTML = `<section class="page diagnostic-page">
+      <div class="page-hero"><span class="eyebrow">FREE DIAGNOSTIC TEST</span><h1>Choose one examination</h1><p>Select an exam for this attempt. The report will show your subject scores and preparation priorities.</p></div>
+      <div class="diagnostic-exams">${state.exams.map(exam => {
+        const paper = state.tests.find(test => test.type === 'diagnostic' && test.examId === exam.id && test.available);
+        return `<article class="diagnostic-exam"><span class="exam-icon">${icon(exam.icon)}</span><div><h2>${escapeHtml(exam.name)}</h2><p>${escapeHtml(exam.authority)}</p>${paper ? `<p>${paper.questions.length} questions · ${Math.round(paper.timing.totalSeconds / 60)} minutes · ${escapeHtml(paper.patternStatus === 'provisional-sample' ? 'Provisional preparation sample' : 'Reviewed diagnostic')}</p>` : '<p>Diagnostic paper in preparation</p>'}</div>${paper ? `<a class="primary-button" href="#/instructions/${encodeURIComponent(paper.id)}">Select exam →</a>` : '<span class="coming-soon-action">Coming soon</span>'}</article>`;
+      }).join('')}</div><p class="diagnostic-note">One exam is selected per attempt. You can choose another exam on a later attempt when its diagnostic is available.</p></section>`;
+  }
+
+  function renderDiagnosticInstructions(test) {
+    document.getElementById('app').innerHTML = `<section class="page narrow diagnostic-page"><a class="back-link" href="#/diagnostic">← Choose exam</a>
+      <article class="instruction-card"><span class="eyebrow">PYQ-PATTERN DIAGNOSTIC · PROVISIONAL SAMPLE</span><h1>${escapeHtml(test.title)}</h1><p>${escapeHtml(test.description)}</p>
+      <p class="diagnostic-note">This ${test.questions.length}-question sample is not a complete or officially validated previous-year paper. Its duration and marking values are the sample's settings. Answers appear after submission.</p>
+      <div class="instruction-stats"><div><strong>${test.questions.length}</strong><span>Questions</span></div><div><strong>${test.totalMarks}</strong><span>Maximum marks</span></div><div><strong>${Math.round(test.timing.totalSeconds / 60)} min</strong><span>Duration</span></div><div><strong>+${test.marking.correct} / ${test.marking.incorrect} / ${test.marking.unanswered}</strong><span>Correct / wrong / blank</span></div></div>
+      <div class="rules-box"><h3>Assessment rules</h3><ul><li>One whole-paper timer; the paper submits when time ends.</li><li>Answers and explanations are shown after submission.</li><li>Progress saves in this browser, including on a page reload.</li></ul></div>
+      <label class="consent"><input type="checkbox" id="rulesAccepted"> I have read the instructions.</label><button class="primary-button full large" id="startDiagnostic" disabled>Start diagnostic →</button></article></section>`;
+    const button = document.getElementById('startDiagnostic');
+    document.getElementById('rulesAccepted').onchange = event => { button.disabled = !event.target.checked; };
+    button.onclick = () => {
+      const saved = TestEngine.activeAttempt();
+      if (saved?.testId && saved.testId !== test.id && !confirm('Starting this paper will replace your saved unfinished attempt. Continue?')) return;
+      sessionStorage.setItem('he_test_settings', JSON.stringify({ mode: 'total-timed', feedbackMode: 'on-completion', markingMode: 'default', marking: test.marking, sound: state.sound }));
+      if (saved?.testId !== test.id) localStorage.removeItem(TestEngine.storageKey);
+      location.hash = `#/attempt/${test.id}`;
+    };
+  }
+
+  function diagnosticBreakdown(row, label) {
+    const attempted = row.correct + row.incorrect;
+    return `<article class="diagnostic-breakdown"><div><strong>${escapeHtml(label || row.label)}</strong><span>${row.correct} correct · ${row.incorrect} wrong · ${row.unanswered} unanswered · ${attempted ? Math.round(row.correct / attempted * 100) + '% accuracy' : '— accuracy'}</span></div><b>${Number(row.earned.toFixed(2))} / ${row.maximum}</b></article>`;
+  }
+
+  function renderDiagnosticResult(result, test) {
+    const exam = state.exams.find(item => item.id === result.examId);
+    const syllabus = state.syllabus.find(item => item.examId === result.examId);
+    const report = DiagnosticReport.build(result, test, syllabus);
+    const focus = report.focus.map(row => `<article class="diagnostic-focus"><strong>${escapeHtml(row.kind === 'subject' ? row.label : `${report.subjects.find(subject => subject.id === row.subjectId)?.label || row.subjectId} → ${row.label}`)}</strong><p>${row.correct} of ${row.total} correct; ${row.unanswered} unanswered. Review this ${row.kind} in the syllabus and practise it again.</p><a href="${state.user ? '#/constable' : '#/landing-exams'}">View syllabus →</a></article>`).join('');
+    document.getElementById('app').innerHTML = `<section class="page diagnostic-page"><a class="back-link" href="#/diagnostic">← Diagnostic exams</a>
+      <div class="page-hero"><span class="eyebrow">DIAGNOSTIC REPORT · ${escapeHtml(result.paperVersion || 'sample')}</span><h1>${escapeHtml(exam?.name || test.title)} report card</h1><p>${escapeHtml(test.patternStatus === 'provisional-sample' ? 'Provisional preparation sample; not an official exam prediction.' : 'Preparation assessment.')}</p></div>
+      <div class="diagnostic-summary"><article><strong>${result.score} / ${result.totalMarks}</strong><span>Overall score (${result.percent}%)</span></article><article><strong>${report.accuracy === null ? '—' : report.accuracy + '%'}</strong><span>Accuracy</span></article><article><strong>${report.attempted} / ${(result.questions || test.questions).length}</strong><span>Attempted</span></article><article><strong>${TestEngine.formatTime(result.timeSeconds)}</strong><span>Time taken</span></article></div>
+      <p class="diagnostic-note">${result.correct} correct · ${result.incorrect} incorrect · ${result.unanswered} unanswered · Marking: +${result.marking?.correct ?? test.marking.correct} correct, ${result.marking?.incorrect ?? test.marking.incorrect} wrong, ${result.marking?.unanswered ?? 0} unanswered. Accuracy counts attempted questions only.</p>
+      <section class="diagnostic-report-section"><h2>Subject-wise performance</h2>${report.subjects.map(row => diagnosticBreakdown(row)).join('')}</section>
+      <section class="diagnostic-report-section"><h2>Topic-wise performance</h2>${report.topics.map(row => diagnosticBreakdown(row, `${report.subjects.find(subject => subject.id === row.subjectId)?.label || row.subjectId} · ${row.label}${row.total < 3 ? ' · needs more assessment' : ''}`)).join('')}</section>
+      <section class="diagnostic-report-section"><h2>Areas of strength</h2><p>${report.strengths.length ? report.strengths.map(row => `${escapeHtml(row.label)} (${row.correct}/${row.total})`).join(' · ') : 'No topic has enough questions and a strong result to confirm a strength yet.'}</p></section>
+      <section class="diagnostic-report-section"><h2>Focus areas</h2>${focus || '<p>No weakness can be established from this sample. Review unanswered questions and take more topic practice to gather evidence.</p>'}<p>${report.needsAssessment.length} topics have fewer than three questions and need more assessment before being labelled strengths or weaknesses.</p></section>
+      <div class="result-actions"><a class="primary-button" href="#/review/${result.id}">Review answers →</a><a class="ghost-button" href="${state.user ? '#/constable' : '#/landing-exams'}">View syllabus</a><a class="ghost-button" href="${state.user ? '#/tests' : '#/login'}">Practise topics</a><a class="ghost-button" href="#/instructions/${test.id}">Retake diagnostic</a></div></section>`;
+  }
+
   function renderInstructions(id) {
     const test = state.tests.find(item => item.id === id);
     if (!test || !test.available) return notFound('This test is coming soon');
+    if (test.type === 'diagnostic') return renderDiagnosticInstructions(test);
     document.getElementById('app').innerHTML = `
       <section class="page narrow">
         <a class="back-link" href="#/tests">← Back to tests</a>
@@ -647,6 +699,7 @@
     const result = TestEngine.getResults().find(item => item.id === id);
     const test = state.tests.find(item => item.id === result?.testId) || state.tests.find(item => item.id === result?.baseTestId);
     if (!result || !test) return notFound('Result not found');
+    if (result.type === 'diagnostic') return renderDiagnosticResult(result, test);
     const circumference = 339.3;
     document.getElementById('app').innerHTML = `
       <section class="page narrow">
