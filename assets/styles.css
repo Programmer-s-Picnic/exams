@@ -47,4 +47,5 @@ body,.test-shell,.onboarding-page{background:var(--page);color:var(--ink)}.topba
 #customMarking[hidden] { display: none !important; }
 #customMarking { margin-top: 1rem; }
 #customMarking label { display: grid; gap: .4rem; }
-#customMarking input { width: 100%; padding: .75rem; border: 1px solid var(--border, #587b70); border-radius: .6rem; background: var(--surface, #fff); color: inherit; }
+#customMarking input { width: 100%; padding: .75rem; border: 1px solid #587b70; border-radius: .6rem; background: #0b1a14; color: #f4faf7; font-size: 1rem; }
+#customMarking input:focus { border-color: #72e4b3; outline: 2px solid #72e4b3; outline-offset: 2px; }
