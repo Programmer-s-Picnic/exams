@@ -4,7 +4,7 @@ Native Flutter client for Android and iOS.
 
 ## Features
 
-- Centralized JSON API client using `examsdata`
+- Centralized JSON API client using `cserver/exams/json`
 - Student/demo login
 - Website-parity Constable onboarding, dashboard and exam hub
 - Only UP Police Constable selectable; upcoming exams are clearly disabled

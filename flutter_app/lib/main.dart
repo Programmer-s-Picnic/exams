@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-const root='https://raw.githubusercontent.com/Programmer-s-Picnic/examsdata/main';
+const root='https://cserver.learnwithchampak.live/exams/json';
 const forest=Color(0xff092e2b), mint=Color(0xff75e6b5), blue=Color(0xff126b5d), ink=Color(0xff17223b), pale=Color(0xfff3f8f6);
 void main()=>runApp(const App());
 

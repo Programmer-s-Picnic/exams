@@ -1,6 +1,6 @@
 (function () {
-  const STORAGE_KEY = 'he_active_attempt_v2';
-  const RESULT_KEY = 'he_results_v2';
+  let STORAGE_KEY = 'he_active_attempt_v2_guest';
+  let RESULT_KEY = 'he_results_v2_guest';
   let timerId = null;
 
   const state = {
@@ -324,6 +324,17 @@
 
   function stop() { clearInterval(timerId); }
   function setSound(value) { state.sound = value; }
+  function setUser(id) {
+    stop(); state.test = null;
+    const suffix = id == null ? 'guest' : String(id);
+    STORAGE_KEY = `he_active_attempt_v2_${suffix}`;
+    RESULT_KEY = `he_results_v2_${suffix}`;
+    if (id == null) {
+      for (const [oldKey, newKey] of [['he_active_attempt_v2', STORAGE_KEY], ['he_results_v2', RESULT_KEY]]) {
+        if (!localStorage.getItem(newKey) && localStorage.getItem(oldKey)) localStorage.setItem(newKey, localStorage.getItem(oldKey));
+      }
+    }
+  }
 
-  window.TestEngine = { start, stop, activeAttempt, getResults, formatTime, setSound, storageKey: STORAGE_KEY };
+  window.TestEngine = { start, stop, activeAttempt, getResults, formatTime, setSound, setUser, get storageKey() { return STORAGE_KEY; } };
 }());
