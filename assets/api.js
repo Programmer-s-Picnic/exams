@@ -23,5 +23,16 @@
     }
     throw lastError;
   }
-  window.Api = { request, root: REMOTE_ROOT };
+  const AUTH_ROOT = 'https://cserver.learnwithchampak.live/exams/api';
+  async function auth(path, data, token) {
+    const response = await fetch(`${AUTH_ROOT}/${path}.php`, {
+      method: data === undefined ? 'GET' : 'POST', retries: 0,
+      headers: { 'Accept': 'application/json', ...(data === undefined ? {} : { 'Content-Type': 'application/json' }), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      ...(data === undefined ? {} : { body: JSON.stringify(data) })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || `Server error (${response.status})`);
+    return result;
+  }
+  window.Api = { request, auth, root: REMOTE_ROOT };
 }());
