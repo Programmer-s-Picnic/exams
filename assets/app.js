@@ -7,11 +7,10 @@
 
   const state = {
     config: null,
-    users: [],
     exams: [],
     tests: [],
     syllabus: [],
-    user: read(KEYS.user),
+    user: null,
     preferences: read(KEYS.preferences) || { selected: [], primary: null },
     sound: read(KEYS.sound) !== false,
     filters: { query: '', exam: 'all', status: 'all' }
@@ -24,10 +23,12 @@
   function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
   }
-  async function hashPassword(value) {
-    const bytes = new TextEncoder().encode(value);
-    const digest = await crypto.subtle.digest('SHA-256', bytes);
-    return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+  function authToken() { return sessionStorage.getItem('he_auth_token') || localStorage.getItem('he_auth_token'); }
+  function saveAuth(result, remember) {
+    sessionStorage.removeItem('he_auth_token'); localStorage.removeItem('he_auth_token');
+    (remember ? localStorage : sessionStorage).setItem('he_auth_token', result.token);
+    state.user = result.user;
+    updateUserShell();
   }
   function icon(name) {
     const icons = {
@@ -51,17 +52,19 @@
 
   async function initialise() {
     try {
-      const [, , config, users, exams, tests, syllabus] = await Promise.all([
+      const [, , config, exams, tests, syllabus] = await Promise.all([
         loadFragment('site-header', 'header.html'),
         loadFragment('site-footer', 'footer.html'),
         Api.request('site-main.json'),
-        Api.request('users-registered.json'),
         Api.request('exams.json'),
         Api.request('tests.json'),
         Api.request('exam-syllabus.json')
       ]);
       state.config = config;
-      state.users = users.users || [];
+      if (authToken()) {
+        try { state.user = (await Api.auth('me', undefined, authToken())).user; }
+        catch (_) { sessionStorage.removeItem('he_auth_token'); localStorage.removeItem('he_auth_token'); }
+      }
       state.exams = exams.exams || [];
       state.tests = tests.tests || [];
       try {
@@ -138,7 +141,7 @@
     TestEngine.stop();
     closeModal();
     const { name, id } = currentRoute();
-    const publicRoutes = ['landing', 'landing-exams', 'landing-how', 'login', 'admin', 'diagnostic'];
+    const publicRoutes = ['landing', 'landing-exams', 'landing-how', 'login', 'register', 'admin', 'diagnostic'];
     const publicDiagnostic = (['instructions', 'attempt'].includes(name) && state.tests.some(test => test.id === id && test.type === 'diagnostic')) || (['result', 'review'].includes(name) && TestEngine.getResults().some(result => result.id === id && result.type === 'diagnostic'));
     if (!state.user && !publicRoutes.includes(name) && !publicDiagnostic) {
       sessionStorage.setItem('he_after_login', location.hash || '#/home');
@@ -156,6 +159,7 @@
       'landing-exams': () => renderLanding('landingExams'),
       'landing-how': () => renderLanding('landingHow'),
       login: renderLogin,
+      register: renderRegister,
       home: renderDashboard,
       constable: renderConstable,
       admin: renderAdmin,
@@ -247,7 +251,7 @@
             <p class="form-error" id="loginError" role="alert"></p>
             <button class="primary-button full" type="submit">Sign in securely →</button>
           </form>
-          <div class="demo-login"><strong>Demo account</strong><span>${copy.demoEmail}</span><span>Password: ${copy.demoPassword}</span></div>
+          <p class="auth-switch">New student? <a href="#/register">Create an account</a></p>
           <div class="trust-row"><span>✓ Student-first design</span><span>✓ Progress saved</span></div>
         </article>
       </section>`;
@@ -260,15 +264,9 @@
       event.preventDefault();
       const login = document.getElementById('loginId').value.trim().toLowerCase();
       const password = document.getElementById('loginPassword').value;
-      const passwordHash = await hashPassword(password);
-      const user = state.users.find(item => [item.email, item.mobile, item.studentId].map(String).map(value => value.toLowerCase()).includes(login) && item.passwordHash === passwordHash);
-      if (!user) {
-        document.getElementById('loginError').textContent = 'The login details do not match our demo records.';
-        return;
-      }
-      state.user = { id: user.id, name: user.name, email: user.email, mobile: user.mobile };
-      write(KEYS.user, state.user);
-      updateUserShell();
+      try {
+        saveAuth(await Api.auth('login', { login, password }), document.getElementById('rememberLogin').checked);
+      } catch (error) { document.getElementById('loginError').textContent = error.message; return; }
       document.body.classList.remove('auth-mode');
       const preselected = sessionStorage.getItem('he_preselected_exam');
       if (preselected && state.exams.some(exam => exam.id === preselected && exam.available)) {
@@ -278,6 +276,35 @@
       const requested = sessionStorage.getItem('he_after_login');
       sessionStorage.removeItem('he_after_login');
       location.hash = requested || (state.preferences.primary ? '#/home' : '#/onboarding');
+    });
+  }
+
+  function renderRegister() {
+    document.body.classList.add('logged-out', 'auth-mode');
+    document.getElementById('app').innerHTML = `<section class="auth-page"><article class="auth-card">
+      <div class="auth-brand"><span class="brand-mark">HE</span><strong>Himanshu Exams</strong></div>
+      <h1>Create account</h1><p>Save your preparation and test results.</p>
+      <form id="registerForm">
+        <label>Full name<input name="name" autocomplete="name" required maxlength="100"></label>
+        <label>Email<input name="email" type="email" autocomplete="email" required></label>
+        <label>Mobile number<input name="mobile" type="tel" autocomplete="tel-national" inputmode="numeric" pattern="[6-9][0-9]{9}" title="Enter a 10-digit Indian mobile number" required></label>
+        <label>Password<input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
+        <label>Confirm password<input name="password_confirmation" type="password" autocomplete="new-password" minlength="8" required></label>
+        <p class="form-error" id="registerError" role="alert"></p>
+        <button class="primary-button full" type="submit">Register →</button>
+      </form><p class="auth-switch">Already registered? <a href="#/login">Sign in</a></p>
+    </article></section>`;
+    document.getElementById('registerForm').addEventListener('submit', async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const data = Object.fromEntries(new FormData(form));
+      const errorNode = document.getElementById('registerError');
+      if (data.password !== data.password_confirmation) { errorNode.textContent = 'Passwords do not match.'; return; }
+      const button = form.querySelector('button[type="submit"]'); button.disabled = true;
+      try {
+        saveAuth(await Api.auth('register', data), true);
+        location.hash = '#/onboarding';
+      } catch (error) { errorNode.textContent = error.message; button.disabled = false; }
     });
   }
 
@@ -781,8 +808,12 @@
     document.getElementById('profileSound').addEventListener('change', event => {
       state.sound = event.target.checked; write(KEYS.sound, state.sound); updateSoundButton();
     });
-    document.getElementById('logoutButton').addEventListener('click', () => {
-      localStorage.removeItem(KEYS.user); state.user = null; updateUserShell(); renderLogin();
+    document.getElementById('logoutButton').addEventListener('click', async event => {
+      event.currentTarget.disabled = true;
+      try { await Api.auth('logout', {}, authToken()); }
+      catch (error) { toast('Could not sign out: ' + error.message); event.currentTarget.disabled = false; return; }
+      sessionStorage.removeItem('he_auth_token'); localStorage.removeItem('he_auth_token');
+      localStorage.removeItem(KEYS.user); state.user = null; updateUserShell(); location.hash = '#/login';
     });
   }
 
@@ -795,7 +826,7 @@
           <details><summary>What is a total-test timer?</summary><p>One countdown covers the entire test. The test submits automatically when it reaches zero.</p></details>
           <details><summary>What is a per-question timer?</summary><p>Every question receives its own countdown. When time ends, the test automatically moves to the next question.</p></details>
           <details><summary>When are answers checked?</summary><p>You may choose immediate checking after every question or keep answers hidden until final submission.</p></details>
-          <details><summary>Is this login production-ready?</summary><p>No. The current JSON login is for demonstration. Production authentication must use a secure server.</p></details>
+          <details><summary>How do I sign in?</summary><p>Register with your email and mobile number, then sign in with your password. Sign out from your profile.</p></details>
         </div>
       </section>`;
   }
