@@ -213,7 +213,10 @@
     document.getElementById('clearAnswer').addEventListener('click', () => { state.answers[state.current] = null; save(); render(); });
     document.getElementById('markReview').addEventListener('click', () => { state.review[state.current] = !state.review[state.current]; save(); render(); });
     document.getElementById('nextQuestion').addEventListener('click', next);
-    document.getElementById('submitTest').addEventListener('click', showSubmitDialog);
+    document.getElementById('submitTest').addEventListener('click', () => {
+      if (state.test?.type === 'diagnostic') finish(false);
+      else showSubmitDialog();
+    });
     document.getElementById('exitTest').addEventListener('click', () => {
       save();
       if (confirm('Your progress is saved. Exit this test?')) location.hash = '#/home';
@@ -233,7 +236,10 @@
       render();
       return;
     }
-    if (state.current === state.test.questions.length - 1) showSubmitDialog();
+    if (state.current === state.test.questions.length - 1) {
+      if (state.test.type === 'diagnostic') finish(false);
+      else showSubmitDialog();
+    }
     else open(state.current + 1);
   }
 
