@@ -499,7 +499,7 @@
         const viewer = document.getElementById('adminViewer');
         viewer.innerHTML = '<div class="loading-screen"><span class="loader"></span><p>Loading file…</p></div>';
         try {
-          const source = file.repository === 'examsdata' ? file.path : file.url;
+          const source = ['examsdata', 'cserver'].includes(file.repository) ? file.path : file.url;
           const isJson = file.category === 'JSON';
           const content = file.category === 'Images' ? null : await Api.request(source, isJson ? {} : { responseType: 'text' });
           viewer.innerHTML = `<div class="admin-viewer-head"><div><span class="eyebrow">${escapeHtml(file.category)} · ${escapeHtml(file.repository)}</span><h2>${adminInfoIcon('file')}${escapeHtml(file.path)}</h2></div><a class="ghost-button" href="${escapeHtml(file.url)}" target="_blank" rel="noopener noreferrer">Open file ↗</a></div>${adminFileInfo(file, manifest)}${isJson ? `<div class="admin-toolbar"><button type="button" id="adminTree" class="active">Tree view</button><button type="button" id="adminRaw">Formatted JSON</button><button type="button" id="adminCopy">Copy JSON</button></div><div id="adminJsonTree" class="json-viewer">${jsonTree(content)}</div><pre id="adminJsonRaw" class="admin-code" hidden><code>${escapeHtml(JSON.stringify(content, null, 2))}</code></pre>` : file.category === 'Images' ? `<div class="admin-image"><img src="${escapeHtml(file.url)}" alt="${escapeHtml(file.path)}" loading="lazy"></div>` : `<pre class="admin-code"><code>${escapeHtml(content)}</code></pre>`}`;
