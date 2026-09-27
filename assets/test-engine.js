@@ -14,6 +14,8 @@
     questionEndsAt: null,
     elapsedSeconds: 0,
     mode: 'total-timed',
+    marking: null,
+    markingMode: 'default',
     feedbackMode: 'on-completion',
     sound: true
   };
@@ -58,6 +60,8 @@
       questionEndsAt: state.questionEndsAt,
       elapsedSeconds: state.elapsedSeconds,
       mode: state.mode,
+      marking: state.marking,
+      markingMode: state.markingMode,
       feedbackMode: state.feedbackMode
     }));
   }
@@ -69,6 +73,8 @@
   function start(test, settings = {}, saved = null) {
     clearInterval(timerId);
     state.test = test;
+    state.markingMode = saved?.markingMode || settings.markingMode || 'default';
+    state.marking = saved?.marking || settings.marking || test.marking || { correct: null, incorrect: -Number(test.negativeMarking || 0), unanswered: 0 };
     state.mode = settings.mode || test.defaultMode || 'total-timed';
     state.feedbackMode = settings.feedbackMode || test.feedbackMode || 'on-completion';
     state.sound = settings.sound !== false;
@@ -161,7 +167,7 @@
         <div class="test-progress"><span style="width:${((state.current + 1) / total) * 100}%"></span></div>
         <div class="test-layout">
           <article class="question-card">
-            <div class="question-meta"><span>${question.topic}</span><b>${question.marks || 1} mark</b></div>
+            <div class="question-meta"><span>${question.topic}</span><b>+${state.markingMode === 'custom' ? state.marking.correct : question.marks ?? state.marking?.correct ?? 1} correct · ${state.marking.incorrect} wrong · ${state.marking.unanswered} unanswered</b></div>
             <h1>${question.question}</h1>
             ${question.code ? `<pre><code>${escapeHtml(question.code)}</code></pre>` : ''}
             <div class="answer-list">
@@ -254,13 +260,14 @@
       const answer = state.answers[index];
       const isCorrect = answer === question.correctOption;
       const attempted = answer !== null;
-      if (isCorrect) { correct += 1; score += Number(question.marks || 1); }
-      else if (attempted) { incorrect += 1; score -= Number(state.test.negativeMarking || 0); }
+      if (isCorrect) { correct += 1; score += Number(state.markingMode === 'custom' ? state.marking.correct : question.marks ?? state.marking?.correct ?? 1); }
+      else if (attempted) { incorrect += 1; score += Number(state.marking.incorrect); }
+      else score += Number(state.marking.unanswered);
       topicScores[question.topic] ||= { correct: 0, total: 0 };
       topicScores[question.topic].total += 1;
       if (isCorrect) topicScores[question.topic].correct += 1;
     });
-    const totalMarks = questions.reduce((sum, question) => sum + Number(question.marks || 1), 0);
+    const totalMarks = questions.reduce((sum, question) => sum + Number(state.markingMode === 'custom' ? state.marking.correct : question.marks ?? state.marking?.correct ?? 1), 0);
     const percent = Math.max(0, Math.round((score / totalMarks) * 100));
     const result = {
       id: `result-${Date.now()}`,
@@ -273,8 +280,10 @@
       correct,
       incorrect,
       unanswered: questions.length - correct - incorrect,
-      score: Math.max(0, Number(score.toFixed(2))),
+      score: Number(score.toFixed(2)),
       totalMarks,
+      marking: state.marking,
+      markingMode: state.markingMode,
       percent,
       passed: percent >= Number(state.test.passPercent || 40),
       timeSeconds: Math.max(1, Math.floor((Date.now() - state.startedAt) / 1000)),

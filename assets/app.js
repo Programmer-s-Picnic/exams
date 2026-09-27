@@ -523,7 +523,7 @@
     const previous = results.find(result => result.testId === test.id);
     return `<article class="test-card">
       <div class="test-card-icon">${icon(test.icon || 'test')}</div>
-      <div class="test-card-copy"><span class="tag-row"><i>${test.difficulty}</i><i>${test.category}</i></span><h3>${test.title}</h3><p>${test.description}</p><div class="test-facts"><span><b>${test.questions.length}</b> questions</span><span><b>${Math.round(test.timing.totalSeconds / 60)}</b> minutes</span><span><b>${test.totalMarks}</b> marks</span><span><b>${test.negativeMarking || 0}</b> negative</span></div></div>
+      <div class="test-card-copy"><span class="tag-row"><i>${test.difficulty}</i><i>${test.category}</i></span><h3>${test.title}</h3><p>${test.description}</p><div class="test-facts"><span><b>${test.questions.length}</b> questions</span><span><b>${Math.round(test.timing.totalSeconds / 60)}</b> minutes</span><span><b>${test.totalMarks}</b> marks</span><span><b>${test.marking?.correct == null ? 'Per question' : `+${test.marking.correct}`} / ${test.marking?.incorrect ?? -Number(test.negativeMarking || 0)}</b> correct / wrong</span></div></div>
       <div class="test-card-action">${test.available ? `${previous ? `<span class="previous-score">${previous.percent}%<small>Latest score</small></span>` : '<span class="new-label">Not attempted</span>'}<a class="primary-button" href="#/instructions/${test.id}">${previous ? 'Try again' : 'View test'} →</a>` : '<span class="coming-soon-action">Coming soon</span>'}</div>
     </article>`;
   }
@@ -564,7 +564,7 @@
         <a class="back-link" href="#/tests">← Back to tests</a>
         <article class="instruction-card">
           <span class="eyebrow">BEFORE YOU BEGIN</span><h1>${test.title}</h1><p>${test.description}</p>
-          <div class="instruction-stats"><div><strong>${test.questions.length}</strong><span>Questions</span></div><div><strong>${test.totalMarks}</strong><span>Marks</span></div><div><strong>${Math.round(test.timing.totalSeconds / 60)} min</strong><span>Default time</span></div><div><strong>${test.negativeMarking || 0}</strong><span>Negative mark</span></div></div>
+          <div class="instruction-stats"><div><strong>${test.questions.length}</strong><span>Questions</span></div><div><strong>${test.totalMarks}</strong><span>Marks</span></div><div><strong>${test.marking?.correct == null ? 'Per question' : `+${test.marking.correct}`}</strong><span>Correct answer</span></div><div><strong>${test.marking?.incorrect ?? -Number(test.negativeMarking || 0)}</strong><span>Wrong answer</span></div><div><strong>${Math.round(test.timing.totalSeconds / 60)} min</strong><span>Default time</span></div></div>
           <div class="settings-section"><h2>Choose timing mode</h2><div class="choice-grid three">
             ${choice('timingMode', 'total-timed', 'Total-test timer', `${Math.round(test.timing.totalSeconds / 60)} minutes for the complete test`, true)}
             ${choice('timingMode', 'question-timed', 'Per-question timer', `${test.timing.questionSeconds} seconds for each question`)}
@@ -574,6 +574,18 @@
             ${choice('feedbackMode', 'on-completion', 'After full submission', 'Results stay hidden during the test', true)}
             ${choice('feedbackMode', 'per-question', 'After every question', 'Immediate correctness and explanation')}
           </div></div>
+          <div class="settings-section"><h2>Marking setup</h2><p>Select the test's suggested rule, turn off negative marking, or enter your own marks. This changes scoring for this attempt only.</p>
+            <div class="choice-grid three">
+              ${choice('markingMode', 'default', 'Suggested marks', 'Use the test marking rule', true)}
+              ${choice('markingMode', 'no-negative', 'No negative marking', 'Keep correct marks; wrong and unanswered score 0')}
+              ${choice('markingMode', 'custom', 'Custom marks', 'Set all three values yourself')}
+            </div>
+            <div id="customMarking" hidden class="choice-grid three">
+              <label>Correct marks<input id="correctMarks" type="number" min="0.01" max="1000" step="0.01" value="${test.marking?.correct ?? test.questions[0]?.marks ?? 1}" required></label>
+              <label>Wrong marks<input id="wrongMarks" type="number" min="-1000" max="0" step="0.01" value="${test.marking?.incorrect ?? -Number(test.negativeMarking || 0)}" required></label>
+              <label>Unanswered marks<input id="unansweredMarks" type="number" min="0" max="1000" step="0.01" value="0" required></label>
+            </div>
+          </div>
           <div class="rules-box"><h3>Test rules</h3><ul><li>Your progress is saved automatically in this browser.</li><li>A total-timed test submits automatically when time ends.</li><li>Per-question mode moves ahead when each question timer ends.</li><li>You can mark questions for review before final submission.</li></ul></div>
           <label class="consent"><input type="checkbox" id="rulesAccepted"> I have read the instructions and am ready to begin.</label>
           <button class="primary-button full large" id="startTest" disabled>Start test →</button>
@@ -581,12 +593,27 @@
       </section>`;
     const consent = document.getElementById('rulesAccepted');
     const start = document.getElementById('startTest');
+    document.querySelectorAll('input[name="markingMode"]').forEach(input => input.addEventListener('change', () => {
+      document.getElementById('customMarking').hidden = document.querySelector('input[name="markingMode"]:checked').value !== 'custom';
+    }));
     consent.addEventListener('change', () => { start.disabled = !consent.checked; });
     start.addEventListener('click', () => {
+      const markingMode = document.querySelector('input[name="markingMode"]:checked').value;
+      let marking = { ...test.marking };
+      if (markingMode === 'no-negative') marking = { ...marking, incorrect: 0 };
+      if (markingMode === 'custom') {
+        const fields = ['correctMarks', 'wrongMarks', 'unansweredMarks'].map(id => document.getElementById(id));
+        if (!fields.every(field => field.reportValidity())) return;
+        marking = { correct: Number(fields[0].value), incorrect: Number(fields[1].value), unanswered: Number(fields[2].value) };
+        if (marking.unanswered > marking.correct) { fields[2].setCustomValidity('Unanswered marks cannot exceed correct marks.'); fields[2].reportValidity(); return; }
+        fields[2].setCustomValidity('');
+      }
       sessionStorage.setItem('he_test_settings', JSON.stringify({
         mode: document.querySelector('input[name="timingMode"]:checked').value,
         feedbackMode: document.querySelector('input[name="feedbackMode"]:checked').value,
-        sound: state.sound
+        sound: state.sound,
+        markingMode,
+        marking
       }));
       localStorage.removeItem(TestEngine.storageKey);
       location.hash = `#/attempt/${test.id}`;
@@ -629,7 +656,7 @@
           <div class="result-ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="54"/><circle class="value" cx="60" cy="60" r="54" style="stroke-dashoffset:${circumference - (circumference * result.percent / 100)}"/></svg><span><strong>${result.percent}%</strong><small>${result.score}/${result.totalMarks}</small></span></div>
           <div class="result-status">${result.passed ? '✓ Passed' : 'Preparation needed'}</div>
         </article>
-        <div class="result-metrics"><article><strong>${result.correct}</strong><span>Correct</span></article><article><strong>${result.incorrect}</strong><span>Incorrect</span></article><article><strong>${result.unanswered}</strong><span>Unanswered</span></article><article><strong>${TestEngine.formatTime(result.timeSeconds)}</strong><span>Time taken</span></article></div>
+        <div class="result-metrics"><article><strong>${result.correct}</strong><span>Correct (${result.markingMode === 'custom' ? `+${result.marking.correct}` : result.marking?.correct == null ? 'per question' : `+${result.marking.correct}`})</span></article><article><strong>${result.incorrect}</strong><span>Incorrect (${result.marking?.incorrect ?? test.marking?.incorrect ?? -Number(test.negativeMarking || 0)})</span></article><article><strong>${result.unanswered}</strong><span>Unanswered (${result.marking?.unanswered ?? 0})</span></article><article><strong>${TestEngine.formatTime(result.timeSeconds)}</strong><span>Time taken</span></article></div>
         <article class="analysis-card"><h2>Subject performance</h2>${Object.entries(result.topicScores).map(([topic, scores]) => {
           const percent = Math.round(scores.correct / scores.total * 100);
           return `<div class="topic-row"><span><strong>${topic}</strong><small>${scores.correct}/${scores.total} correct</small></span><div><i style="width:${percent}%"></i></div><b>${percent}%</b></div>`;
