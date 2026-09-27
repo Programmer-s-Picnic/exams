@@ -571,7 +571,7 @@
   function renderDiagnosticInstructions(test) {
     document.getElementById('app').innerHTML = `<section class="page narrow diagnostic-page"><a class="back-link" href="#/diagnostic">← Choose exam</a>
       <article class="instruction-card"><span class="eyebrow">PYQ-PATTERN DIAGNOSTIC · PROVISIONAL SAMPLE</span><h1>${escapeHtml(test.title)}</h1><p>${escapeHtml(test.description)}</p>
-      <p class="diagnostic-note">This ${test.questions.length}-question sample is not a complete or officially validated previous-year paper. Its duration and marking values are the sample's settings. Answers appear after submission.</p>
+      <p class="diagnostic-note">This ${test.questions.length}-question sample is not a complete or officially validated previous-year paper. The timer, answer feedback and marking rule are fixed for every diagnostic attempt. Answers appear after submission.</p>
       <div class="instruction-stats"><div><strong>${test.questions.length}</strong><span>Questions</span></div><div><strong>${test.totalMarks}</strong><span>Maximum marks</span></div><div><strong>${Math.round(test.timing.totalSeconds / 60)} min</strong><span>Duration</span></div><div><strong>+${test.marking.correct} / ${test.marking.incorrect} / ${test.marking.unanswered}</strong><span>Correct / wrong / blank</span></div></div>
       <div class="rules-box"><h3>Assessment rules</h3><ul><li>One whole-paper timer; the paper submits when time ends.</li><li>Answers and explanations are shown after submission.</li><li>Progress saves in this browser, including on a page reload.</li></ul></div>
       <label class="consent"><input type="checkbox" id="rulesAccepted"> I have read the instructions.</label><button class="primary-button full large" id="startDiagnostic" disabled>Start diagnostic →</button></article></section>`;
@@ -580,7 +580,6 @@
     button.onclick = () => {
       const saved = TestEngine.activeAttempt();
       if (saved?.testId && saved.testId !== test.id && !confirm('Starting this paper will replace your saved unfinished attempt. Continue?')) return;
-      sessionStorage.setItem('he_test_settings', JSON.stringify({ mode: 'total-timed', feedbackMode: 'on-completion', markingMode: 'default', marking: test.marking, sound: state.sound }));
       if (saved?.testId !== test.id) localStorage.removeItem(TestEngine.storageKey);
       location.hash = `#/attempt/${test.id}`;
     };
