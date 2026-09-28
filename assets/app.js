@@ -239,6 +239,54 @@
     return `<article class="public-exam-card"><div class="public-exam-top"><span class="exam-icon">${icon(exam.icon)}</span><i>${exam.available ? exam.status : 'Coming soon'}</i></div><h3>${exam.name}</h3><p>${exam.description}</p><dl><div><dt>Authority</dt><dd>${exam.authority}</dd></div><div><dt>Negative marking</dt><dd>${exam.negativeMarking || 'None'}</dd></div><div><dt>Subjects</dt><dd>${exam.subjects.length}</dd></div></dl>${exam.available ? `<button type="button" data-public-exam="${exam.id}">Select this exam →</button>` : '<span class="coming-soon-action">Coming soon</span>'}</article>`;
   }
 
+  let googleConfigPromise;
+  let googleScriptPromise;
+  function loadGoogleScript() {
+    if (!googleScriptPromise) googleScriptPromise = new Promise((resolve, reject) => {
+      if (window.google?.accounts?.id) { resolve(); return; }
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.onload = resolve;
+      script.onerror = () => reject(new Error('Could not load Google sign-in'));
+      document.head.appendChild(script);
+    });
+    return googleScriptPromise;
+  }
+  async function renderGoogleButton(containerId, onCredential) {
+    try {
+      googleConfigPromise ||= Api.auth('google-config');
+      const config = await googleConfigPromise;
+      if (!config.enabled || !config.clientId) return;
+      await loadGoogleScript();
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      container.hidden = false;
+      google.accounts.id.initialize({ client_id: config.clientId, callback: onCredential, ux_mode: 'popup' });
+      google.accounts.id.renderButton(container, { theme: 'outline', size: 'large', text: 'continue_with', shape: 'pill', width: Math.min(container.clientWidth || 360, 360) });
+    } catch (error) { console.warn('Google sign-in is unavailable:', error.message); }
+  }
+  function completeSignIn() {
+    document.body.classList.remove('auth-mode');
+    const preselected = sessionStorage.getItem('he_preselected_exam');
+    if (preselected && state.exams.some(exam => exam.id === preselected && exam.available)) {
+      state.preferences = { selected: [preselected], primary: preselected };
+      sessionStorage.removeItem('he_preselected_exam');
+    }
+    const requested = sessionStorage.getItem('he_after_login');
+    sessionStorage.removeItem('he_after_login');
+    location.hash = requested || (state.preferences.primary ? '#/home' : '#/onboarding');
+  }
+  async function signInWithGoogle(credential, errorId) {
+    try {
+      saveAuth(await Api.auth('google-login', { credential }), true);
+      completeSignIn();
+    } catch (error) {
+      const node = document.getElementById(errorId);
+      if (node) node.textContent = error.message;
+    }
+  }
+
   function renderLogin() {
     document.body.classList.add('logged-out', 'auth-mode');
     const copy = state.config.content.login;
@@ -257,6 +305,7 @@
             <p class="form-error" id="loginError" role="alert"></p>
             <button class="primary-button full" type="submit">Sign in securely →</button>
           </form>
+          <div class="google-auth" id="googleLogin" hidden></div>
           <p class="auth-switch">New student? <a href="#/register">Create an account</a></p>
           <div class="trust-row"><span>✓ Student-first design</span><span>✓ Progress saved</span></div>
         </article>
@@ -273,16 +322,9 @@
       try {
         saveAuth(await Api.auth('login', { login, password }), document.getElementById('rememberLogin').checked);
       } catch (error) { document.getElementById('loginError').textContent = error.message; return; }
-      document.body.classList.remove('auth-mode');
-      const preselected = sessionStorage.getItem('he_preselected_exam');
-      if (preselected && state.exams.some(exam => exam.id === preselected && exam.available)) {
-        state.preferences = { selected: [preselected], primary: preselected };
-        sessionStorage.removeItem('he_preselected_exam');
-      }
-      const requested = sessionStorage.getItem('he_after_login');
-      sessionStorage.removeItem('he_after_login');
-      location.hash = requested || (state.preferences.primary ? '#/home' : '#/onboarding');
+      completeSignIn();
     });
+    renderGoogleButton('googleLogin', response => signInWithGoogle(response.credential, 'loginError'));
   }
 
   function renderRegister() {
@@ -298,7 +340,7 @@
         <label>Confirm password<input name="password_confirmation" type="password" autocomplete="new-password" minlength="8" required></label>
         <p class="form-error" id="registerError" role="alert"></p>
         <button class="primary-button full" type="submit">Register →</button>
-      </form><p class="auth-switch">Already registered? <a href="#/login">Sign in</a></p>
+      </form><div class="google-auth" id="googleRegister" hidden></div><p class="auth-switch">Already registered? <a href="#/login">Sign in</a></p>
     </article></section>`;
     document.getElementById('registerForm').addEventListener('submit', async event => {
       event.preventDefault();
@@ -312,6 +354,7 @@
         location.hash = '#/onboarding';
       } catch (error) { errorNode.textContent = error.message; button.disabled = false; }
     });
+    renderGoogleButton('googleRegister', response => signInWithGoogle(response.credential, 'registerError'));
   }
 
   function renderOnboarding() {
@@ -809,6 +852,7 @@
         </article>
         <article class="settings-card"><h2>Preparation preferences</h2><p><b>Primary goal:</b> ${examName(state.preferences.primary)}</p><p><b>Selected exams:</b> ${state.preferences.selected.map(examName).join(', ')}</p><a class="primary-button" href="#/onboarding">Update exam goals</a></article>
         <article class="settings-card"><h2>Application settings</h2><label class="setting-toggle"><span><strong>Test sounds</strong><small>Timer warnings and answer feedback</small></span><input id="profileSound" type="checkbox" ${state.sound ? 'checked' : ''}></label></article>
+        <article class="settings-card" id="googleLinkSection" hidden><h2>Google sign-in</h2><p>Link the Google account with the same email to use it when signing in.</p><div class="google-auth" id="googleLink"></div><p class="form-error" id="googleLinkError" role="alert"></p></article>
         <button class="danger-button" id="logoutButton">Sign out</button>
       </section>`;
     document.getElementById('profileSound').addEventListener('change', event => {
@@ -820,6 +864,15 @@
       catch (error) { toast('Could not sign out: ' + error.message); event.currentTarget.disabled = false; return; }
       sessionStorage.removeItem('he_auth_token'); localStorage.removeItem('he_auth_token');
       localStorage.removeItem(KEYS.user); useAccount(null); updateUserShell(); location.hash = '#/login';
+    });
+    renderGoogleButton('googleLink', async response => {
+      try {
+        await Api.auth('google-link', { credential: response.credential }, authToken());
+        toast('Google account linked.');
+        document.getElementById('googleLinkError').textContent = 'Google account linked.';
+      } catch (error) { document.getElementById('googleLinkError').textContent = error.message; }
+    }).then(() => {
+      if (document.getElementById('googleLink')?.childElementCount) document.getElementById('googleLinkSection').hidden = false;
     });
   }
 
