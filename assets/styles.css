@@ -54,3 +54,21 @@ body,.test-shell,.onboarding-page{background:var(--page);color:var(--ink)}.topba
 .diagnostic-page{color:var(--ink)}.diagnostic-exams{display:grid;gap:12px}.diagnostic-exam{display:flex;gap:18px;align-items:center;padding:18px;border:1px solid var(--line);border-radius:16px;background:var(--card,#10201a)}.diagnostic-exam>div{flex:1}.diagnostic-exam h2{margin:0 0 6px;font-size:18px}.diagnostic-exam p{margin:3px 0;color:var(--muted)}.diagnostic-note{margin:16px 0;color:var(--muted);line-height:1.55}.diagnostic-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:20px 0}.diagnostic-summary article,.diagnostic-report-section{padding:20px;border:1px solid var(--line);border-radius:16px;background:var(--card,#10201a)}.diagnostic-summary strong,.diagnostic-summary span,.diagnostic-breakdown strong,.diagnostic-breakdown span{display:block}.diagnostic-summary strong{font-size:23px;color:#9af0bf}.diagnostic-summary span,.diagnostic-breakdown span{font-size:12px;color:var(--muted);margin-top:6px}.diagnostic-report-section{margin:16px 0}.diagnostic-report-section h2{margin:0 0 16px;font-size:19px}.diagnostic-breakdown{display:flex;justify-content:space-between;align-items:center;gap:16px;border-top:1px solid var(--line);padding:13px 0}.diagnostic-breakdown b{white-space:nowrap;color:#a3ebbf}.diagnostic-focus{background:#163b2a;border:1px solid #31684a;border-radius:12px;padding:15px;margin:10px 0}.diagnostic-focus p{color:var(--muted)}.diagnostic-focus a{color:#a3ebbf}
 @media(max-width:760px){.diagnostic-banner,.diagnostic-exam{align-items:flex-start;flex-direction:column}.diagnostic-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.diagnostic-summary strong{font-size:19px}.diagnostic-exam .primary-button{width:100%;text-align:center}}
 .auth-switch{margin:18px 0 0;text-align:center;font-size:14px}.auth-switch a{color:var(--primary);font-weight:800}
+
+/* Keep form text readable on the dark theme, including the higher-specificity auth fields. */
+input:not([type=checkbox]):not([type=radio]),textarea,select,
+.auth-card input:not([type=checkbox]),.admin-search input,#customMarking input{
+  background:#10251d;color:#f8fffb;border-color:#648c78;
+  caret-color:#98f7ca;color-scheme:dark;
+}
+input::placeholder,textarea::placeholder{color:#b5c9bf;opacity:1}
+input:not([type=checkbox]):not([type=radio]):focus,textarea:focus,select:focus,
+.auth-card input:not([type=checkbox]):focus,.admin-search input:focus,#customMarking input:focus{
+  background:#18392b;color:#fff;border-color:#99f2bd;
+  outline:3px solid #99f2bd;outline-offset:2px;
+  box-shadow:0 0 0 5px rgba(87,218,146,.17);
+}
+input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus{
+  -webkit-text-fill-color:#f8fffb;box-shadow:0 0 0 1000px #18392b inset;
+  caret-color:#98f7ca;
+}
