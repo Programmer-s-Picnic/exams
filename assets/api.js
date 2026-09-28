@@ -8,7 +8,6 @@
     const candidates = /^https?:\/\//.test(path)
       ? [path]
       : [`${REMOTE_ROOT}/${path.replace(/^\//, '')}`, `${LEGACY_ROOT}/${path.replace(/^\//, '')}`, `${LOCAL_ROOT}/${path.replace(/^\//, '')}`];
-    let lastError;
     for (const url of candidates) {
       for (let attempt = 0; attempt <= retries; attempt += 1) {
         try {
@@ -17,12 +16,12 @@
           if (responseType === 'text') return await response.text();
           if (responseType === 'response') return response;
           return await response.json();
-        } catch (error) {
-          lastError = new Error(`Could not load ${url}: ${error.message}`);
+        } catch (_) {
+          // Try the next data source.
         }
       }
     }
-    throw lastError;
+    throw new Error('Content is temporarily unavailable. Please try again.');
   }
   const AUTH_ROOT = 'https://cserver.learnwithchampak.live/exams/api';
   async function auth(path, data, token) {
@@ -32,7 +31,10 @@
       ...(data === undefined ? {} : { body: JSON.stringify(data) })
     });
     const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.error || `Server error (${response.status})`);
+    if (!response.ok) {
+      const expected = [400, 401, 403, 409, 422].includes(response.status);
+      throw new Error(expected && typeof result.error === 'string' ? result.error : 'The service is temporarily unavailable. Please try again.');
+    }
     return result;
   }
   window.Api = { request, auth, root: REMOTE_ROOT };
