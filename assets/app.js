@@ -86,8 +86,7 @@
       route();
       window.addEventListener('hashchange', route);
     } catch (error) {
-      console.error(error);
-      document.getElementById('app').innerHTML = `<section class="error-state"><div class="empty-icon">!</div><h1>We could not load the application</h1><p>${escapeHtml(error.message)}</p><button class="primary-button" onclick="location.reload()">Try again</button></section>`;
+      document.getElementById('app').innerHTML = `<section class="error-state"><div class="empty-icon">!</div><h1>We could not load the application</h1><p>Please try again in a moment.</p><button class="primary-button" onclick="location.reload()">Try again</button></section>`;
     }
   }
 
@@ -187,7 +186,6 @@
   function renderLanding(scrollTarget = null) {
     document.body.classList.remove('auth-mode');
     const content = state.config.content.landing;
-    const verification = state.config.content.verification;
     const questionCount = state.tests.reduce((total, test) => total + test.questions.length, 0);
     const capabilities = content.capabilities.map(item => {
       const value = item.valueFrom === 'questionCount' ? `${questionCount}${item.suffix || ''}` : item.value;
@@ -196,7 +194,6 @@
     const featuredTest = state.tests.find(test => test.available) || state.tests[0];
     document.getElementById('app').innerHTML = `
       <div class="public-landing">
-        <section class="verification-strip"><span>${verification.label}</span><p>${verification.message}</p><time>Checked ${formatDate(verification.lastChecked)}</time></section>
         <section class="landing-hero">
           <div class="landing-glow one"></div><div class="landing-glow two"></div>
           <div class="landing-hero-inner">
@@ -264,7 +261,7 @@
       container.hidden = false;
       google.accounts.id.initialize({ client_id: config.clientId, callback: onCredential, ux_mode: 'popup' });
       google.accounts.id.renderButton(container, { theme: 'outline', size: 'large', text: 'continue_with', shape: 'pill', width: Math.min(container.clientWidth || 360, 360) });
-    } catch (error) { console.warn('Google sign-in is unavailable:', error.message); }
+    } catch (_) { /* The Google button is optional until configured. */ }
   }
   function completeSignIn() {
     document.body.classList.remove('auth-mode');
@@ -557,13 +554,13 @@
             document.getElementById('adminRaw').onclick = () => { document.getElementById('adminJsonTree').hidden = true; document.getElementById('adminJsonRaw').hidden = false; };
             document.getElementById('adminCopy').onclick = async () => { await navigator.clipboard.writeText(JSON.stringify(content, null, 2)); toast('JSON copied.'); };
           }
-        } catch (error) { viewer.innerHTML = `<div class="error-state"><h2>File could not be loaded</h2><p>${escapeHtml(error.message)}</p><a href="${escapeHtml(file.url)}" target="_blank" rel="noopener noreferrer">Open original file ↗</a></div>`; }
+        } catch (error) { viewer.innerHTML = `<div class="error-state"><h2>File could not be loaded</h2><p>Please try again later.</p><a href="${escapeHtml(file.url)}" target="_blank" rel="noopener noreferrer">Open original file ↗</a></div>`; }
       });
       mount.querySelectorAll('[data-model-file]').forEach(node => node.addEventListener('click', () => {
         const button = fileList.querySelector(`[data-admin-file="${node.dataset.modelFile}"]`);
         if (button) { button.hidden = false; button.click(); document.querySelector('.admin-layout').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
       }));
-    } catch (error) { mount.innerHTML = `<section class="page"><div class="error-state"><h1>Content inventory unavailable</h1><p>${escapeHtml(error.message)}</p></div></section>`; }
+    } catch (error) { mount.innerHTML = `<section class="page"><div class="error-state"><h1>Content inventory unavailable</h1><p>Please try again later.</p></div></section>`; }
   }
 
   function renderConstable() {
@@ -861,7 +858,7 @@
     document.getElementById('logoutButton').addEventListener('click', async event => {
       event.currentTarget.disabled = true;
       try { await Api.auth('logout', {}, authToken()); }
-      catch (error) { toast('Could not sign out: ' + error.message); event.currentTarget.disabled = false; return; }
+      catch (error) { toast('Could not sign out. Please try again.'); event.currentTarget.disabled = false; return; }
       sessionStorage.removeItem('he_auth_token'); localStorage.removeItem('he_auth_token');
       localStorage.removeItem(KEYS.user); useAccount(null); updateUserShell(); location.hash = '#/login';
     });
