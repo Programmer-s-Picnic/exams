@@ -72,3 +72,5 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
   -webkit-text-fill-color:#f8fffb;box-shadow:0 0 0 1000px #18392b inset;
   caret-color:#98f7ca;
 }
+.google-auth{display:flex;justify-content:center;margin:20px auto 4px;max-width:360px}
+.google-auth[hidden],#googleLinkSection[hidden]{display:none}
