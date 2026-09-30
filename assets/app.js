@@ -51,9 +51,7 @@
   }
 
   async function loadFragment(id, url) {
-    const response = await fetch(url, { cache: 'no-store' });
-    if (!response.ok) throw new Error(`Could not load ${url}`);
-    document.getElementById(id).innerHTML = await response.text();
+    document.getElementById(id).innerHTML = await Api.request(url, { direct: true, responseType: 'text' });
   }
 
   async function initialise() {
@@ -146,14 +144,14 @@
     TestEngine.stop();
     closeModal();
     const { name, id } = currentRoute();
-    const publicRoutes = ['landing', 'landing-exams', 'landing-how', 'login', 'register', 'admin', 'diagnostic'];
+    const publicRoutes = ['landing', 'landing-exams', 'landing-how', 'login', 'register', 'inventory', 'diagnostic'];
     const publicDiagnostic = (['instructions', 'attempt'].includes(name) && state.tests.some(test => test.id === id && test.type === 'diagnostic')) || (['result', 'review'].includes(name) && TestEngine.getResults().some(result => result.id === id && result.type === 'diagnostic'));
     if (!state.user && !publicRoutes.includes(name) && !publicDiagnostic) {
       sessionStorage.setItem('he_after_login', location.hash || '#/home');
       location.hash = '#/login';
       return;
     }
-    if (state.user && !state.preferences.primary && !['onboarding', 'profile', 'admin', 'diagnostic'].includes(name) && !publicDiagnostic) {
+    if (state.user && !state.preferences.primary && !['onboarding', 'profile', 'admin', 'inventory', 'diagnostic'].includes(name) && !publicDiagnostic) {
       location.hash = '#/onboarding';
       return;
     }
@@ -167,7 +165,8 @@
       register: renderRegister,
       home: renderDashboard,
       constable: renderConstable,
-      admin: renderAdmin,
+      admin: () => AdminConsole.render(state, authToken()),
+      inventory: renderAdmin,
       onboarding: renderOnboarding,
       tests: renderTests,
       diagnostic: renderDiagnosticSelection,
@@ -528,7 +527,7 @@
     mount.innerHTML = '<section class="page"><div class="loading-screen"><span class="loader"></span><p>Loading content inventory…</p></div></section>';
     try {
       const manifest = await Api.request('content-manifest.json');
-      if (location.hash !== '#/admin') return;
+      if (location.hash !== '#/inventory') return;
       const groups = ['JSON', 'CSS', 'JavaScript', 'Images', 'HTML'];
       mount.innerHTML = `<section class="page admin-page"><div class="page-hero"><span class="eyebrow">READ-ONLY CONTENT BROWSER</span><h1>Site admin · content inventory</h1><p>Browse published files, understand what they store, and see exactly where they are used. These files are public; this page does not provide secure admin access or editing.</p></div>${adminDataMap(manifest)}<div class="admin-layout"><aside class="admin-sidebar"><label class="admin-search">Find a file<input id="adminSearch" type="search" placeholder="Name, data, purpose or page"></label><div id="adminFileList">${groups.map(group => `<section class="admin-file-group"><h2>${group} <small>${manifest.files.filter(file => file.category === group).length}</small></h2>${manifest.files.filter(file => file.category === group).map(file => { const detail = manifest.fileDetails?.[file.path] || {}; return `<button type="button" data-admin-file="${manifest.files.indexOf(file)}" title="${escapeHtml(file.repository + '/' + file.path)}"><strong>${escapeHtml(file.path)}</strong>${detail.storedData ? `<small>${escapeHtml(detail.storedData)}</small>` : ''}</button>`; }).join('')}</section>`).join('')}</div></aside><article class="admin-preview"><div id="adminViewer"><h2>Select a file</h2><p>${manifest.notes.map(escapeHtml).join(' ')}</p></div></article></div></section>`;
       document.querySelector('.data-model')?.insertAdjacentHTML('beforebegin', window.AdminDiagrams?.render() || '');

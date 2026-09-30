@@ -4,15 +4,15 @@
   const LOCAL_ROOT = '../examsdata';
 
   async function request(path, options = {}) {
-    const { responseType = 'json', retries = 1, ...fetchOptions } = options;
-    const candidates = /^https?:\/\//.test(path)
+    const { responseType = 'json', retries = 1, direct = false, acceptErrors = false, ...fetchOptions } = options;
+    const candidates = direct ? [path] : /^https?:\/\//.test(path)
       ? [path]
       : [`${REMOTE_ROOT}/${path.replace(/^\//, '')}`, `${LEGACY_ROOT}/${path.replace(/^\//, '')}`, `${LOCAL_ROOT}/${path.replace(/^\//, '')}`];
     for (const url of candidates) {
       for (let attempt = 0; attempt <= retries; attempt += 1) {
         try {
           const response = await fetch(url, { cache: 'no-store', ...fetchOptions });
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          if (!response.ok && !acceptErrors) throw new Error(`HTTP ${response.status}`);
           if (responseType === 'text') return await response.text();
           if (responseType === 'response') return response;
           return await response.json();
@@ -25,8 +25,8 @@
   }
   const AUTH_ROOT = 'https://cserver.learnwithchampak.live/exams/api';
   async function auth(path, data, token) {
-    const response = await fetch(`${AUTH_ROOT}/${path}.php`, {
-      method: data === undefined ? 'GET' : 'POST', retries: 0,
+    const response = await request(`${AUTH_ROOT}/${path}.php`, {
+      method: data === undefined ? 'GET' : 'POST', retries: 0, responseType: 'response', acceptErrors: true,
       headers: { 'Accept': 'application/json', ...(data === undefined ? {} : { 'Content-Type': 'application/json' }), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       ...(data === undefined ? {} : { body: JSON.stringify(data) })
     });
