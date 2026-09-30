@@ -92,7 +92,7 @@
     const site = state.config.site;
     document.title = `${site.name} | ${site.tagline}`;
     document.getElementById('siteDescription').content = site.description;
-    document.querySelectorAll('[data-site-name]').forEach(node => { node.textContent = site.name; });
+    document.querySelectorAll('[data-site-name]').forEach(node => { node.innerHTML = escapeHtml(site.name).replace(/Guru$/, '<span class="brand-accent">Guru</span>'); });
     document.querySelectorAll('[data-site-short]').forEach(node => { node.textContent = site.shortName; });
     document.querySelectorAll('[data-site-tagline]').forEach(node => { node.textContent = site.tagline; });
     document.querySelectorAll('[data-site-year]').forEach(node => { node.textContent = new Date().getFullYear(); });
