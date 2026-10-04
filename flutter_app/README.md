@@ -5,7 +5,8 @@ Native Flutter client for Android and iOS.
 ## Features
 
 - Centralized JSON API client using `cserver/exams/json`
-- Student/demo login
+- PHP-backed student registration, login, session restore and logout
+- Per-account preferences, saved attempt and local result history
 - Website-parity Constable onboarding, dashboard and exam hub
 - Only UP Police Constable selectable; upcoming exams are clearly disabled
 - Official Constable sources, syllabus, recruitment stages and practice area
@@ -13,6 +14,8 @@ Native Flutter client for Android and iOS.
 - Per-question or end-of-test feedback
 - Question review, negative marking, topic analysis and result summary
 - Shuffled retakes: unanswered, unanswered + wrong, wrong only, or all
+- Dedicated Constable diagnostic with locked timer, marking and feedback rules
+- Diagnostic report card with answer review and preparation focus guidance
 - Responsive Material 3 interface
 
 ## Demo login
