@@ -25,6 +25,18 @@ jobs:
         run: |
           flutter create --platforms=android --org live.learnwithchampak --project-name himanshu_exams .
           rm -f test/widget_test.dart
+      - name: Configure release signing
+        working-directory: flutter_app
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+        run: |
+          test -n "$RELEASE_KEYSTORE_BASE64"
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > android/app/release.jks
+          printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=release.jks\n' \
+            "$RELEASE_STORE_PASSWORD" "$RELEASE_KEY_PASSWORD" "$RELEASE_KEY_ALIAS" > android/key.properties
       - name: Get packages
         working-directory: flutter_app
         run: flutter pub get
