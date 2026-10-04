@@ -23,8 +23,17 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("clientTest") {
+            storeFile = file("client-test.keystore")
+            storePassword = "android"
+            keyAlias = "clienttest"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
-        release { signingConfig = signingConfigs.getByName("debug") }
+        release { signingConfig = signingConfigs.getByName("clientTest") }
     }
 }
 
