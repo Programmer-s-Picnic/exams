@@ -6,6 +6,7 @@ Native Flutter client for Android and iOS.
 
 - Centralized JSON API client using `cserver/exams/json`
 - PHP-backed student registration, login, session restore and logout
+- Google sign-in for both login and account creation
 - Per-account preferences, saved attempt and local result history
 - Website-parity Constable onboarding, dashboard and exam hub
 - Only UP Police Constable selectable; upcoming exams are clearly disabled
