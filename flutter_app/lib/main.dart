@@ -352,19 +352,19 @@ class _Login extends State<Login>{
     }
   }
   Future<void>go()async{
-    setState(()=>{busy=true,err=null});
+    setState(() { busy=true; err=null; });
     try{
       final result=await Api.auth('login',body:{'login':id.text.trim().toLowerCase(),'password':pw.text});
       final u=Map<String,dynamic>.from(result['user']);
       Store.scope='${u['id']}';
       await Store.set('user',u);await Store.set('token','${result['token']}');
       await finish(u);
-    }catch(e){if(mounted)setState(()=>{busy=false,err='$e'});}
+    }catch(e){if(mounted)setState(() { busy=false; err='$e'; });}
   }
   Future<void>google()async{
-    setState(()=>{busy=true,err=null});
+    setState(() { busy=true; err=null; });
     try{await finish(await googleAccount());}
-    catch(e){if(mounted)setState(()=>{busy=false,err=googleError(e)});}
+    catch(e){if(mounted)setState(() { busy=false; err=googleError(e); });}
   }
   @override Widget build(BuildContext c)=>Scaffold(
     backgroundColor:forest,
@@ -415,7 +415,7 @@ class _Register extends State<Register>{
     if(password.text!=confirm.text){setState(()=>err='Passwords do not match.');return;}
     if(!RegExp(r'^[6-9][0-9]{9}$').hasMatch(mobile.text.trim())){setState(()=>err='Enter a valid 10-digit Indian mobile number.');return;}
     if(password.text.length<8){setState(()=>err='Password must contain at least 8 characters.');return;}
-    setState(()=>{busy=true,err=null});
+    setState(() { busy=true; err=null; });
     try{
       final result=await Api.auth('register',body:{
         'name':name.text.trim(),'email':email.text.trim().toLowerCase(),'mobile':mobile.text.trim(),
@@ -424,12 +424,12 @@ class _Register extends State<Register>{
       final u=Map<String,dynamic>.from(result['user']);
       Store.scope='${u['id']}';await Store.set('user',u);await Store.set('token','${result['token']}');
       await finish(u);
-    }catch(e){if(mounted)setState(()=>{busy=false,err='$e'});}
+    }catch(e){if(mounted)setState(() { busy=false; err='$e'; });}
   }
   Future<void>google()async{
-    setState(()=>{busy=true,err=null});
+    setState(() { busy=true; err=null; });
     try{await finish(await googleAccount());}
-    catch(e){if(mounted)setState(()=>{busy=false,err=googleError(e)});}
+    catch(e){if(mounted)setState(() { busy=false; err=googleError(e); });}
   }
   @override Widget build(BuildContext c)=>Scaffold(
     backgroundColor:forest,
@@ -549,7 +549,7 @@ class _Shell extends State<Shell>{
     final r=await Store.list('results');
     final a=await Store.map('active');
     final s=await Store.boolValue('sound');
-    if(mounted)setState(()=>{results=r,active=a,sound=s});
+    if(mounted)setState(() { results=r; active=a; sound=s; });
   }
   void go(int index)=>setState(()=>tab=index);
   Future<void>toggleSound()async{
