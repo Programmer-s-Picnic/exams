@@ -26,7 +26,8 @@
     try { info = await Api.auth('admin', undefined, token); }
     catch (error) {
       if (location.hash !== '#/admin') return;
-      renderAdminLogin(mount, state, token ? error.message : '');
+      sessionStorage.removeItem('he_admin_token');
+      renderAdminLogin(mount, state, '');
       return;
     }
     if (location.hash !== '#/admin') return;

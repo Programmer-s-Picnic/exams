@@ -171,3 +171,95 @@ body.admin-mode #app {
     flex-wrap: wrap;
   }
 }
+
+
+/* Administration is a separate light interface. */
+body.admin-mode {
+  --primary:#2457d6;
+  --primary-dark:#1746a2;
+  --primary-soft:#eaf2ff;
+  --ink:#172033;
+  --muted:#667085;
+  --line:#dfe5ee;
+  --page:#f4f7fb;
+  --card:#ffffff;
+  --success:#168a56;
+  --success-soft:#e7f7ef;
+  --warning:#b76d00;
+  --warning-soft:#fff5dc;
+  --danger:#d64545;
+  --danger-soft:#fff0f0;
+  color-scheme:light;
+  color:#172033;
+  background:#f4f7fb;
+}
+body.admin-mode .admin-standalone,
+body.admin-mode .admin-page {
+  color:#172033;
+}
+body.admin-mode .admin-login-card {
+  color:#172033;
+  background:#ffffff;
+  border:1px solid #dfe5ee;
+}
+body.admin-mode .admin-login-card h1 {
+  color:#172033;
+}
+body.admin-mode .admin-login-card > p,
+body.admin-mode .admin-login-card .admin-status {
+  color:#667085;
+}
+body.admin-mode .admin-login-card .eyebrow {
+  color:#168a56;
+}
+body.admin-mode .admin-login-card label {
+  color:#344054;
+}
+body.admin-mode .admin-login-card input {
+  background:#ffffff !important;
+  color:#172033 !important;
+  border:1px solid #cfd8e3 !important;
+  caret-color:#172033;
+}
+body.admin-mode .admin-login-card input:focus {
+  border-color:#2457d6 !important;
+  outline:3px solid #dbe7ff;
+}
+body.admin-mode .admin-login-card .primary-button {
+  background:#1746a2;
+  color:#ffffff;
+}
+body.admin-mode .admin-workspace,
+body.admin-mode .admin-menu button {
+  background:#ffffff;
+  color:#172033;
+  border-color:#dfe5ee;
+}
+body.admin-mode .admin-menu button.active {
+  background:#eaf2ff;
+  color:#1746a2;
+  border-color:#8fb1ff;
+}
+body.admin-mode .admin-metrics article {
+  background:#eef4ff;
+}
+body.admin-mode .admin-metrics b {
+  color:#1746a2;
+}
+body.admin-mode .admin-editor {
+  background:#ffffff;
+  color:#172033;
+  border-color:#cfd8e3;
+}
+body.admin-mode .admin-table td,
+body.admin-mode .admin-table th {
+  border-color:#dfe5ee;
+  color:#172033;
+}
+body.admin-mode .admin-status,
+body.admin-mode .admin-guide {
+  color:#667085;
+}
+body.admin-mode .admin-shell-header {
+  background:#102f75;
+}
