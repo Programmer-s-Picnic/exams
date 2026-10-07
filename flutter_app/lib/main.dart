@@ -326,6 +326,7 @@ class Landing extends StatelessWidget{
             onTap:ok?(){Navigator.pop(c);login(c,exam:'${e['id']}');}:null,
           );
         }),
+        const DeveloperCredit(),
       ]),
     )),
   );
@@ -991,6 +992,21 @@ class DiagnosticPage extends StatelessWidget{
   );
 }
 
+class DeveloperCredit extends StatelessWidget{
+  const DeveloperCredit({super.key});
+  @override Widget build(BuildContext c)=>Padding(
+    padding:const EdgeInsets.symmetric(vertical:16),
+    child:Center(child:Text.rich(
+      const TextSpan(children:[
+        TextSpan(text:'Developed and maintained by '),
+        TextSpan(text:'Champak Roy',style:TextStyle(fontWeight:FontWeight.w900)),
+      ]),
+      textAlign:TextAlign.center,
+      style:const TextStyle(color:muted,fontSize:12),
+    )),
+  );
+}
+
 class GuidePage extends StatelessWidget{
   const GuidePage({super.key});
   @override Widget build(BuildContext c)=>Scaffold(
@@ -1009,6 +1025,7 @@ class GuidePage extends StatelessWidget{
         GuideStep(7,'Retake weak areas','Retake wrong, unanswered or all questions with fresh shuffling where supported.'),
         GuideStep(8,'Resume saved attempts','Active attempts are saved automatically on this device.'),
       ])),
+      const DeveloperCredit(),
     ]),
   );
 }
@@ -1039,6 +1056,7 @@ class MorePage extends StatelessWidget{
       },
       icon:const Icon(Icons.logout),label:const Text('Sign out'),
     ),
+    const DeveloperCredit(),
   ]);
 }
 
