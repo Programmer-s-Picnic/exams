@@ -10,6 +10,7 @@
     exams: [],
     tests: [],
     syllabus: [],
+    papers: [],
     user: null,
     preferences: { selected: [], primary: null },
     sound: read(KEYS.sound) !== false,
@@ -56,13 +57,14 @@
 
   async function initialise() {
     try {
-      const [, , config, exams, tests, syllabus] = await Promise.all([
+      const [, , config, exams, tests, syllabus, papers] = await Promise.all([
         loadFragment('site-header', 'header.html'),
         loadFragment('site-footer', 'footer.html'),
         Api.request('site-main.json'),
         Api.request('exams.json'),
         Api.request('tests.json'),
-        Api.request('exam-syllabus.json')
+        Api.request('exam-syllabus.json'),
+        Api.request('exams-old-papers.json')
       ]);
       state.config = config;
       if (authToken()) {
@@ -76,6 +78,7 @@
         if (retake?.id && Array.isArray(retake.questions)) state.tests.push(retake);
       } catch (_) {}
       state.syllabus = syllabus.syllabi || [];
+      state.papers = papers.papers || [];
       const available = state.exams.find(exam => exam.available)?.id;
       state.preferences.selected = (state.preferences.selected || []).filter(id => state.exams.some(exam => exam.id === id && exam.available));
       if (!state.preferences.selected.includes(state.preferences.primary)) state.preferences.primary = available && state.preferences.selected.includes(available) ? available : null;
@@ -563,25 +566,88 @@
   }
 
   function renderConstable() {
+    if (!state.user) {
+      sessionStorage.setItem('he_after_login', '#/constable');
+      location.hash = '#/login';
+      return;
+    }
+    if (!state.preferences.selected.includes('up-police') || state.preferences.primary !== 'up-police') {
+      sessionStorage.setItem('he_after_login', '#/constable');
+      location.hash = '#/onboarding';
+      return;
+    }
+
     const exam = state.exams.find(item => item.id === 'up-police');
     const syllabus = state.syllabus.find(item => item.examId === exam?.id);
     if (!exam || !syllabus) return notFound('Constable information is unavailable');
+
+    const papers = state.papers
+      .filter(item => item.examId === exam.id)
+      .sort((a, b) => String(b.examDate || '').localeCompare(String(a.examDate || '')) || Number(a.shift || 0) - Number(b.shift || 0));
+    const paperYears = [...new Set(papers.map(item => item.year))].sort((a, b) => Number(b) - Number(a));
     const tests = state.tests.filter(test => test.id.startsWith('up-police-constable-') && !test.baseTestId);
     const results = TestEngine.getResults().filter(result => tests.some(test => test.id === (result.baseTestId || result.testId)));
     const latest = results[0];
     const weak = latest && Object.entries(latest.topicScores || {}).sort((a, b) => a[1].correct / a[1].total - b[1].correct / b[1].total)[0]?.[0];
+
+    const paperCard = paper => {
+      const date = paper.examDate ? new Date(`${paper.examDate}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : paper.year;
+      const badge = paper.series === 'latest-exam' ? 'LATEST EXAM PAPER' : 'PREVIOUS YEAR PAPER';
+      return `<article class="hub-tile">
+        <small>${badge} · VERIFIED ${escapeHtml(paper.verifiedAt || '')}</small>
+        <h3>${escapeHtml(date)} · Shift ${escapeHtml(paper.shift)}</h3>
+        <p>${escapeHtml(paper.language || 'Hindi / English')} · ${escapeHtml(paper.questionsExpected || 150)} questions</p>
+        <div class="document-actions">
+          <a class="ghost-button" href="${escapeHtml(paper.paperUrl)}" target="_blank" rel="noopener noreferrer">Open paper PDF ↗</a>
+          <a class="ghost-button" href="${escapeHtml(paper.officialVerificationUrl)}" target="_blank" rel="noopener noreferrer">Official verification ↗</a>
+        </div>
+      </article>`;
+    };
+
+    const paperGroups = paperYears.map(year => {
+      const rows = papers.filter(item => item.year === year);
+      const label = Number(year) === 2026 ? 'Latest written examination' : 'Previous-year re-examination';
+      return `<div class="paper-year-group"><h3>${escapeHtml(year)} · ${label}</h3><div class="hub-grid">${rows.map(paperCard).join('')}</div></div>`;
+    }).join('');
+
     document.getElementById('app').innerHTML = `
       <section class="page constable-hub">
         <a class="back-link" href="#/home">← Dashboard</a>
         <div class="page-hero"><span class="eyebrow">YOUR EXAM</span><h1>${escapeHtml(exam.name)}</h1><p>${escapeHtml(exam.description)}</p><small>Sources checked ${escapeHtml(exam.verifiedAt)} · Preparation content is independent of the recruitment board.</small></div>
-        <nav class="hub-nav" aria-label="Constable sections">${[['overview','Overview'],['syllabus','Syllabus'],['practice','Practice'],['settings','Test modes'],['results','Results'],['stages','Stages']].map(([id,label]) => `<button type="button" data-hub-section="constable-${id}">${label}</button>`).join('')}</nav>
-        <section class="hub-section" id="constable-overview"><h2>Exam overview and official documents</h2><p>Read the notification and corrigendum together before relying on recruitment dates, eligibility or scoring rules. Select a document to view it below.</p><div class="hub-grid">${exam.sources.map((source, index) => `<div class="hub-tile"><strong>${escapeHtml(source.label)}</strong><div class="document-actions"><button class="ghost-button" type="button" data-document="${index}">View here</button><a class="ghost-button" href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">Open original ↗</a></div></div>`).join('')}</div><div id="officialDocument" class="document-frame" hidden><div class="document-heading"><strong id="documentTitle"></strong><a id="documentOriginal" href="#" target="_blank" rel="noopener noreferrer">Open original ↗</a></div><iframe id="documentIframe" title="Official Constable document" loading="lazy" referrerpolicy="no-referrer"></iframe><p>Preview unavailable? Use “Open original” above. Official websites can prevent embedding.</p></div></section>
-        <section class="hub-section" id="constable-syllabus"><h2>Subject and topic outline</h2><p>${escapeHtml(syllabus.note)}</p><div class="hub-grid">${syllabus.sections.map(section => `<article class="hub-tile"><h3>${escapeHtml(section.name)}</h3><ul>${section.topics.map(topic => `<li>${escapeHtml(topic)}</li>`).join('')}</ul></article>`).join('')}</div></section>
-        <section class="hub-section" id="constable-practice"><h2>Subject practice and sample mock</h2><p>Try short subject exercises or a mixed sample. A full official-pattern mock will appear after its questions and rules have been reviewed.</p><div class="test-list">${tests.map(test => testCard(test, results)).join('') || '<p>No practice tests are available yet.</p>'}</div></section>
+        <nav class="hub-nav" aria-label="Constable sections">${[['overview','Overview'],['syllabus','Syllabus'],['papers','Previous papers'],['practice','Practice'],['settings','Test modes'],['results','Results'],['stages','Stages']].map(([id,label]) => `<button type="button" data-hub-section="constable-${id}">${label}</button>`).join('')}</nav>
+
+        <section class="hub-section" id="constable-overview">
+          <h2>Exam overview and official documents</h2>
+          <p>Read the current notification and examination-process notice before relying on recruitment dates, eligibility or scoring rules. Select a document to view it below.</p>
+          <div class="hub-grid">${exam.sources.map((source, index) => `<div class="hub-tile"><strong>${escapeHtml(source.label)}</strong><div class="document-actions"><button class="ghost-button" type="button" data-document="${index}">View here</button><a class="ghost-button" href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">Open original ↗</a></div></div>`).join('')}</div>
+          <div id="officialDocument" class="document-frame" hidden><div class="document-heading"><strong id="documentTitle"></strong><a id="documentOriginal" href="#" target="_blank" rel="noopener noreferrer">Open original ↗</a></div><iframe id="documentIframe" title="Official Constable document" loading="lazy" referrerpolicy="no-referrer"></iframe><p>Preview unavailable? Use “Open original” above. Official websites can prevent embedding.</p></div>
+        </section>
+
+        <section class="hub-section" id="constable-syllabus">
+          <h2>Verified official syllabus</h2>
+          <p>${escapeHtml(syllabus.note)}</p>
+          <div class="hub-grid">
+            <article class="hub-tile"><small>PAPER SIZE</small><h3>${escapeHtml(syllabus.totalQuestions || 150)} questions</h3><p>${escapeHtml(syllabus.totalMarks || 300)} maximum marks</p></article>
+            <article class="hub-tile"><small>DURATION</small><h3>${escapeHtml(syllabus.durationMinutes || 120)} minutes</h3><p>Objective written examination</p></article>
+            <article class="hub-tile"><small>SCORING</small><h3>+${escapeHtml(syllabus.marksPerCorrect || 2)} correct</h3><p>${syllabus.negativeMarking ? 'Negative marking applies' : 'No negative marking'}</p></article>
+            <article class="hub-tile"><small>SOURCE</small><h3>UPPRPB official notification</h3><p>Appendix 1 · pages ${escapeHtml((syllabus.sourcePages || []).join('–'))}</p><a class="ghost-button" href="${escapeHtml(syllabus.source)}" target="_blank" rel="noopener noreferrer">Open syllabus source ↗</a></article>
+          </div>
+          <div class="hub-grid">${syllabus.sections.map(section => `<article class="hub-tile"><h3>${escapeHtml(section.name)}</h3><ul>${section.topics.map(topic => `<li>${escapeHtml(topic)}</li>`).join('')}</ul></article>`).join('')}</div>
+        </section>
+
+        <section class="hub-section" id="constable-papers">
+          <h2>Verified previous question papers</h2>
+          <p>${papers.length} shift-wise papers are catalogued. Each entry keeps the downloadable paper copy separate from the UPPRPB notice used to verify the examination date and shift.</p>
+          ${paperGroups || '<p>No verified papers are available yet.</p>'}
+          <p class="diagnostic-note">Paper PDFs may be hosted by independent archives. “Official verification” always opens the corresponding UPPRPB notice; archive publishers are not presented as the recruitment board.</p>
+        </section>
+
+        <section class="hub-section" id="constable-practice"><h2>Subject practice and sample mock</h2><p>Try short subject exercises or a mixed sample. The verified syllabus and previous papers above will be used to expand topic practice and full-length mocks.</p><div class="test-list">${tests.map(test => testCard(test, results)).join('') || '<p>No practice tests are available yet.</p>'}</div></section>
         <section class="hub-section" id="constable-settings"><h2>Choose your test mode</h2><p>Each test lets you choose a whole-test timer, a per-question timer or untimed practice. Check answers after each question or only after submission.</p><a class="primary-button" href="#/tests">Browse test settings →</a></section>
         <section class="hub-section" id="constable-results"><h2>Results and retakes</h2><p>${latest ? `${results.length} attempt${results.length === 1 ? '' : 's'} · latest score ${latest.percent}%. ${weak ? `Suggested next focus: ${escapeHtml(weak)}.` : ''}` : 'Complete a practice test to see your score, explanations and topic analysis.'}</p>${latest ? `<a class="primary-button" href="#/result/${latest.id}">Review latest result →</a>` : '<a class="primary-button" href="#/tests">Start practising →</a>'}<p>On the result page, retake unanswered, unanswered and wrong, wrong only, or all questions with fresh shuffles.</p></section>
         <section class="hub-section" id="constable-stages"><h2>Recruitment stages</h2><div class="hub-grid">${exam.stages.map((stage, index) => `<article class="hub-tile"><small>STAGE ${index + 1}</small><h3>${escapeHtml(stage.name)}</h3><p>${escapeHtml(stage.description)}</p></article>`).join('')}</div><p>For current criteria and schedules, use the official links above.</p></section>
       </section>`;
+
     document.querySelectorAll('[data-hub-section]').forEach(button => button.addEventListener('click', () => document.getElementById(button.dataset.hubSection)?.scrollIntoView({ behavior: 'smooth' })));
     document.querySelectorAll('[data-document]').forEach(button => button.addEventListener('click', () => {
       const source = exam.sources[Number(button.dataset.document)];
