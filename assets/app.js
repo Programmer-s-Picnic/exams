@@ -147,7 +147,7 @@
     TestEngine.stop();
     closeModal();
     const { name, id } = currentRoute();
-    const publicRoutes = ['landing', 'landing-exams', 'landing-how', 'login', 'register', 'inventory', 'diagnostic'];
+    const publicRoutes = ['landing', 'landing-exams', 'landing-how', 'login', 'register', 'diagnostic', 'admin'];
     const publicDiagnostic = (['instructions', 'attempt'].includes(name) && state.tests.some(test => test.id === id && test.type === 'diagnostic')) || (['result', 'review'].includes(name) && TestEngine.getResults().some(result => result.id === id && result.type === 'diagnostic'));
     if (!state.user && !publicRoutes.includes(name) && !publicDiagnostic) {
       sessionStorage.setItem('he_after_login', location.hash || '#/home');
@@ -160,6 +160,7 @@
     }
     document.querySelectorAll('[data-nav]').forEach(link => link.classList.toggle('active', link.dataset.nav === (name === 'result' ? 'results' : name)));
     document.body.classList.toggle('focus-mode', name === 'attempt');
+    document.body.classList.toggle('admin-mode', name === 'admin');
     const routes = {
       landing: renderLanding,
       'landing-exams': () => renderLanding('landingExams'),
@@ -169,7 +170,7 @@
       home: renderDashboard,
       constable: renderConstable,
       admin: () => AdminConsole.render(state, authToken()),
-      inventory: renderAdmin,
+      inventory: () => { location.hash = '#/admin'; },
       onboarding: renderOnboarding,
       tests: renderTests,
       diagnostic: renderDiagnosticSelection,
@@ -597,7 +598,7 @@
       const sourceLink = paper.publicSourceUrl ? `<a class="ghost-button" href="${escapeHtml(paper.publicSourceUrl)}" target="_blank" rel="noopener noreferrer">Government paper ↗</a>` : '';
       const officialNotice = paper.officialVerificationUrl ? `<a class="ghost-button" href="${escapeHtml(paper.officialVerificationUrl)}" target="_blank" rel="noopener noreferrer">Official notice ↗</a>` : '';
       return `<article class="hub-tile">
-        <small>${badge} · ADMIN VALIDATED</small>
+        <small>${badge}</small>
         <h3>${escapeHtml(date)} · Shift ${escapeHtml(paper.shift)}</h3>
         <p>${escapeHtml(paper.language || 'Hindi / English')} · ${escapeHtml(paper.questionsExpected || 150)} questions</p>
         ${sourceLink || officialNotice ? `<div class="document-actions">${sourceLink}${officialNotice}</div>` : ''}
@@ -613,7 +614,7 @@
     document.getElementById('app').innerHTML = `
       <section class="page constable-hub">
         <a class="back-link" href="#/home">← Dashboard</a>
-        <div class="page-hero"><span class="eyebrow">YOUR EXAM</span><h1>${escapeHtml(exam.name)}</h1><p>${escapeHtml(exam.description)}</p><small>Sources checked ${escapeHtml(exam.verifiedAt)} · Preparation content is independent of the recruitment board.</small></div>
+        <div class="page-hero"><span class="eyebrow">YOUR EXAM</span><h1>${escapeHtml(exam.name)}</h1><p>${escapeHtml(exam.description)}</p></div>
         <nav class="hub-nav" aria-label="Constable sections">${[['overview','Overview'],['howto','How to use'],['syllabus','Syllabus'],['papers','Previous papers'],['practice','Practice'],['settings','Test modes'],['results','Results'],['stages','Stages']].map(([id,label]) => `<button type="button" data-hub-section="constable-${id}">${label}</button>`).join('')}</nav>
 
         <section class="hub-section" id="constable-overview">
@@ -624,16 +625,15 @@
         </section>
 
         <section class="hub-section" id="constable-howto">
-          <h2>How to use this exam page</h2>
+          <h2>How to use this exam</h2>
           <div class="hub-grid">
             <article class="hub-tile"><small>STEP 1</small><h3>Choose the exam</h3><p>Sign in and select UP Police Constable as your primary exam. This page is available only after exam selection.</p></article>
-            <article class="hub-tile"><small>STEP 2</small><h3>Read the validated syllabus</h3><p>Use the Syllabus section to see admin-reviewed subjects and topics. Government source links are shown when available.</p></article>
-            <article class="hub-tile"><small>STEP 3</small><h3>Use previous-paper data</h3><p>Only exam-site-admin approved paper records appear here. A source is shown only when it is a government document or an archive of an original government URL.</p></article>
+            <article class="hub-tile"><small>STEP 2</small><h3>Review the syllabus</h3><p>Use the Syllabus section to understand the subjects and topics covered in the examination.</p></article>
+            <article class="hub-tile"><small>STEP 3</small><h3>Review previous papers</h3><p>Browse available previous-paper information by year and shift before moving to focused practice.</p></article>
             <article class="hub-tile"><small>STEP 4</small><h3>Practise topic-wise</h3><p>Choose focused practice to answer questions with the configured feedback mode and review weak areas.</p></article>
             <article class="hub-tile"><small>STEP 5</small><h3>Take timed tests</h3><p>Use the available mock or diagnostic tests. Read the instructions before starting because timer and marking rules may be fixed.</p></article>
             <article class="hub-tile"><small>STEP 6</small><h3>Review and retake</h3><p>Open Results to see scores and topic performance, then retake all, wrong, unanswered, or wrong-and-unanswered questions where supported.</p></article>
           </div>
-          <p class="diagnostic-note">“Admin validated” means an approved exam-site administrator reviewed the record before it was published. It does not mean the preparation website is affiliated with UPPRPB.</p>
           <a class="ghost-button" href="#/help">Open full student guide →</a>
         </section>
 
@@ -648,17 +648,17 @@
               <article class="hub-tile"><small>SOURCE</small><h3>UPPRPB official notification</h3><p>Appendix 1 · pages ${escapeHtml((syllabus.sourcePages || []).join('–'))}</p><a class="ghost-button" href="${escapeHtml(syllabus.source)}" target="_blank" rel="noopener noreferrer">Open government source ↗</a></article>
             </div>
             <div class="hub-grid">${syllabus.sections.map(section => `<article class="hub-tile"><h3>${escapeHtml(section.name)}</h3><ul>${section.topics.map(topic => `<li>${escapeHtml(topic)}</li>`).join('')}</ul></article>`).join('')}</div>
-          ` : '<p>The syllabus is being reviewed by the exam-site admin before publication.</p>'}
+          ` : '<p>Syllabus details will be available shortly.</p>'}
         </section>
 
         <section class="hub-section" id="constable-papers">
           <h2>Previous question papers</h2>
-          <p>${papers.length ? `${papers.length} exam-site-admin validated shift-wise paper records are available.` : 'Previous paper data is being reviewed by the exam-site admin before publication.'}</p>
+          <p>${papers.length ? `${papers.length} shift-wise paper records are available.` : 'Previous papers will be available shortly.'}</p>
           ${paperGroups}
-          <p class="diagnostic-note">Source links are shown only when they lead to a government document or an archived copy of an original government URL.</p>
+
         </section>
 
-        <section class="hub-section" id="constable-practice"><h2>Subject practice and sample mock</h2><p>Try short subject exercises or a mixed sample. The verified syllabus and previous papers above will be used to expand topic practice and full-length mocks.</p><div class="test-list">${tests.map(test => testCard(test, results)).join('') || '<p>No practice tests are available yet.</p>'}</div></section>
+        <section class="hub-section" id="constable-practice"><h2>Practice and mock tests</h2><p>Use subject practice and mock tests to strengthen preparation and review performance.</p><div class="test-list">${tests.map(test => testCard(test, results)).join('') || '<p>No practice tests are available yet.</p>'}</div></section>
         <section class="hub-section" id="constable-settings"><h2>Choose your test mode</h2><p>Each test lets you choose a whole-test timer, a per-question timer or untimed practice. Check answers after each question or only after submission.</p><a class="primary-button" href="#/tests">Browse test settings →</a></section>
         <section class="hub-section" id="constable-results"><h2>Results and retakes</h2><p>${latest ? `${results.length} attempt${results.length === 1 ? '' : 's'} · latest score ${latest.percent}%. ${weak ? `Suggested next focus: ${escapeHtml(weak)}.` : ''}` : 'Complete a practice test to see your score, explanations and topic analysis.'}</p>${latest ? `<a class="primary-button" href="#/result/${latest.id}">Review latest result →</a>` : '<a class="primary-button" href="#/tests">Start practising →</a>'}<p>On the result page, retake unanswered, unanswered and wrong, wrong only, or all questions with fresh shuffles.</p></section>
         <section class="hub-section" id="constable-stages"><h2>Recruitment stages</h2><div class="hub-grid">${exam.stages.map((stage, index) => `<article class="hub-tile"><small>STAGE ${index + 1}</small><h3>${escapeHtml(stage.name)}</h3><p>${escapeHtml(stage.description)}</p></article>`).join('')}</div><p>For current criteria and schedules, use the official links above.</p></section>
@@ -718,14 +718,14 @@
       <div class="page-hero"><span class="eyebrow">FREE DIAGNOSTIC TEST</span><h1>Choose one examination</h1><p>Select an exam for this attempt. The report will show your subject scores and preparation priorities.</p></div>
       <div class="diagnostic-exams">${state.exams.map(exam => {
         const paper = state.tests.find(test => test.type === 'diagnostic' && test.examId === exam.id && test.available);
-        return `<article class="diagnostic-exam"><span class="exam-icon">${icon(exam.icon)}</span><div><h2>${escapeHtml(exam.name)}</h2><p>${escapeHtml(exam.authority)}</p>${paper ? `<p>${paper.questions.length} questions · ${Math.round(paper.timing.totalSeconds / 60)} minutes · ${escapeHtml(paper.patternStatus === 'provisional-sample' ? 'Provisional preparation sample' : 'Reviewed diagnostic')}</p>` : '<p>Diagnostic paper in preparation</p>'}</div>${paper ? `<a class="primary-button" href="#/instructions/${encodeURIComponent(paper.id)}">Select exam →</a>` : '<span class="coming-soon-action">Coming soon</span>'}</article>`;
+        return `<article class="diagnostic-exam"><span class="exam-icon">${icon(exam.icon)}</span><div><h2>${escapeHtml(exam.name)}</h2><p>${escapeHtml(exam.authority)}</p>${paper ? `<p>${paper.questions.length} questions · ${Math.round(paper.timing.totalSeconds / 60)} minutes · Diagnostic test</p>` : '<p>Diagnostic paper in preparation</p>'}</div>${paper ? `<a class="primary-button" href="#/instructions/${encodeURIComponent(paper.id)}">Select exam →</a>` : '<span class="coming-soon-action">Coming soon</span>'}</article>`;
       }).join('')}</div><p class="diagnostic-note">One exam is selected per attempt. You can choose another exam on a later attempt when its diagnostic is available.</p></section>`;
   }
 
   function renderDiagnosticInstructions(test) {
     document.getElementById('app').innerHTML = `<section class="page narrow diagnostic-page"><a class="back-link" href="#/diagnostic">← Choose exam</a>
-      <article class="instruction-card"><span class="eyebrow">PYQ-PATTERN DIAGNOSTIC · PROVISIONAL SAMPLE</span><h1>${escapeHtml(test.title)}</h1><p>${escapeHtml(test.description)}</p>
-      <p class="diagnostic-note">This ${test.questions.length}-question sample is not a complete or officially validated previous-year paper. The timer, answer feedback and marking rule are fixed for every diagnostic attempt. Answers appear after submission.</p>
+      <article class="instruction-card"><span class="eyebrow">FREE DIAGNOSTIC TEST</span><h1>${escapeHtml(test.title)}</h1><p>${escapeHtml(test.description)}</p>
+      <p class="diagnostic-note">This ${test.questions.length}-question diagnostic assesses preparation across the available subjects. The timer, answer feedback and marking rules are fixed for this test.</p>
       <div class="instruction-stats"><div><strong>${test.questions.length}</strong><span>Questions</span></div><div><strong>${test.totalMarks}</strong><span>Maximum marks</span></div><div><strong>${Math.round(test.timing.totalSeconds / 60)} min</strong><span>Duration</span></div><div><strong>+${test.marking.correct} / ${test.marking.incorrect} / ${test.marking.unanswered}</strong><span>Correct / wrong / blank</span></div></div>
       <div class="rules-box"><h3>Assessment rules</h3><ul><li>One whole-paper timer; the paper submits when time ends.</li><li>Answers and explanations are shown after submission.</li><li>Progress saves in this browser, including on a page reload.</li></ul></div>
       <label class="consent"><input type="checkbox" id="rulesAccepted"> I have read the instructions.</label><button class="primary-button full large" id="startDiagnostic" disabled>Start diagnostic →</button></article></section>`;
@@ -750,7 +750,7 @@
     const report = DiagnosticReport.build(result, test, syllabus);
     const focus = report.focus.map(row => `<article class="diagnostic-focus"><strong>${escapeHtml(row.kind === 'subject' ? row.label : `${report.subjects.find(subject => subject.id === row.subjectId)?.label || row.subjectId} → ${row.label}`)}</strong><p>${row.correct} of ${row.total} correct; ${row.unanswered} unanswered. Review this ${row.kind} in the syllabus and practise it again.</p><a href="${state.user ? '#/constable' : '#/landing-exams'}">View syllabus →</a></article>`).join('');
     document.getElementById('app').innerHTML = `<section class="page diagnostic-page"><a class="back-link" href="#/diagnostic">← Diagnostic exams</a>
-      <div class="page-hero"><span class="eyebrow">DIAGNOSTIC REPORT · ${escapeHtml(result.paperVersion || 'sample')}</span><h1>${escapeHtml(exam?.name || test.title)} report card</h1><p>${escapeHtml(test.patternStatus === 'provisional-sample' ? 'Provisional preparation sample; not an official exam prediction.' : 'Preparation assessment.')}</p></div>
+      <div class="page-hero"><span class="eyebrow">DIAGNOSTIC REPORT</span><h1>${escapeHtml(exam?.name || test.title)} report card</h1><p>Review your subject-wise performance and focus areas.</p></div>
       <div class="diagnostic-summary"><article><strong>${result.score} / ${result.totalMarks}</strong><span>Overall score (${result.percent}%)</span></article><article><strong>${report.accuracy === null ? '—' : report.accuracy + '%'}</strong><span>Accuracy</span></article><article><strong>${report.attempted} / ${(result.questions || test.questions).length}</strong><span>Attempted</span></article><article><strong>${TestEngine.formatTime(result.timeSeconds)}</strong><span>Time taken</span></article></div>
       <p class="diagnostic-note">${result.correct} correct · ${result.incorrect} incorrect · ${result.unanswered} unanswered · Marking: +${result.marking?.correct ?? test.marking.correct} correct, ${result.marking?.incorrect ?? test.marking.incorrect} wrong, ${result.marking?.unanswered ?? 0} unanswered. Accuracy counts attempted questions only.</p>
       <section class="diagnostic-report-section"><h2>Subject-wise performance</h2>${report.subjects.map(row => diagnosticBreakdown(row)).join('')}</section>
@@ -957,18 +957,16 @@
   function renderHelp() {
     document.getElementById('app').innerHTML = `
       <section class="page narrow">
-        <div class="page-hero compact"><span class="eyebrow">STUDENT GUIDE</span><h1>How to use Himanshu Exams</h1><p>Use this sequence to move from exam selection to focused improvement.</p></div>
+        <div class="page-hero compact"><span class="eyebrow">STUDENT GUIDE</span><h1>How to use UP NaukriGuru</h1><p>Follow this sequence for a clear preparation workflow.</p></div>
         <div class="faq-list">
-          <details open><summary>1. How do I start?</summary><p>Sign in, choose your target examination and set a primary exam. For the current release, select UP Police Constable to open its exam hub.</p></details>
-          <details><summary>2. Where should I check the syllabus?</summary><p>Open your exam page and use the Syllabus section. Imported syllabus content is shown only after exam-site-admin validation. Government source links are displayed when available.</p></details>
-          <details><summary>3. How do previous-year papers work?</summary><p>The Previous papers section shows only admin-approved records. A public source link is displayed only for a government document or a Wayback copy of an original government URL. Other approved paper data may appear without a source label.</p></details>
-          <details><summary>4. How should I use practice tests?</summary><p>Use topic or subject practice for focused revision. Depending on the test, answers may be checked instantly or after final submission.</p></details>
-          <details><summary>5. What is a total-test timer?</summary><p>One countdown covers the entire test. The test submits automatically when it reaches zero.</p></details>
-          <details><summary>6. What is a per-question timer?</summary><p>Every question receives its own countdown. When time ends, the test automatically moves to the next question.</p></details>
-          <details><summary>7. Are my answers saved?</summary><p>Yes. Active attempts are saved automatically in this browser and can be resumed from the dashboard.</p></details>
-          <details><summary>8. How do I improve after a test?</summary><p>Open Results, review wrong and unanswered questions, inspect topic performance and use the available retake filters to practise the areas that need work.</p></details>
-          <details><summary>9. What does “Admin validated” mean?</summary><p>It means an approved exam-site administrator reviewed that imported record before publication. Editing an approved record hides it again until it is revalidated.</p></details>
-          <details><summary>10. Are official links always shown?</summary><p>Only government documents or archived copies of original government URLs are shown as public sources. The platform is an independent preparation service and is not the recruitment board.</p></details>
+          <details open><summary>1. Choose your examination</summary><p>Sign in, select your target examination and set the exam you want to focus on.</p></details>
+          <details><summary>2. Review the syllabus</summary><p>Open the exam page and use the Syllabus section to understand the subjects and topics you need to prepare.</p></details>
+          <details><summary>3. Review previous papers</summary><p>Use the Previous papers section to understand the examination style, year and shift information available for your exam.</p></details>
+          <details><summary>4. Practise by subject and topic</summary><p>Use focused practice to strengthen individual areas before attempting longer tests.</p></details>
+          <details><summary>5. Take mock and diagnostic tests</summary><p>Read the instructions before starting. Some tests use a whole-test timer, while others may use per-question timing or untimed practice.</p></details>
+          <details><summary>6. Check your results</summary><p>Review your score, accuracy, unanswered questions and topic performance after completing a test.</p></details>
+          <details><summary>7. Retake weak areas</summary><p>Where available, retake wrong questions, unanswered questions, or the complete test with fresh question and option shuffling.</p></details>
+          <details><summary>8. Are my active attempts saved?</summary><p>Yes. Active attempts are saved automatically in this browser so you can continue an unfinished test.</p></details>
         </div>
         <div class="result-actions"><a class="primary-button" href="#/constable">Open my exam →</a><a class="ghost-button" href="#/tests">Browse tests</a><a class="ghost-button" href="#/results">View results</a></div>
       </section>`;

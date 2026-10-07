@@ -1,5 +1,25 @@
 (function () {
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function renderAdminLogin(mount, state, message = '') {
+    mount.innerHTML = `<section class="admin-standalone"><div class="admin-login-card"><img src="favicon.svg?v=upnaukriguru" alt="" width="64" height="64"><span class="eyebrow">UP NAUKRIGURU ADMINISTRATION</span><h1>Admin sign in</h1><p>Use an authorised administrator account.</p>${message ? `<p class="form-error">${esc(message)}</p>` : ''}<label>Email or mobile<input id="adminLoginId" autocomplete="username"></label><label>Password<input id="adminLoginPassword" type="password" autocomplete="current-password"></label><button class="primary-button full" id="adminLoginButton">Sign in</button><p class="admin-status" id="adminLoginStatus"></p></div></section>`;
+    const button = document.getElementById('adminLoginButton');
+    button.onclick = async () => {
+      const login = document.getElementById('adminLoginId').value.trim();
+      const password = document.getElementById('adminLoginPassword').value;
+      const status = document.getElementById('adminLoginStatus');
+      if (!login || !password) { status.textContent = 'Enter your login and password.'; return; }
+      button.disabled = true; status.textContent = 'Signing in…';
+      try {
+        const result = await Api.auth('login', {login, password});
+        sessionStorage.setItem('he_auth_token', result.token);
+        localStorage.removeItem('he_auth_token');
+        await window.AdminConsole.render(state, result.token);
+      } catch (error) {
+        status.textContent = error.message;
+        button.disabled = false;
+      }
+    };
+  }
   window.AdminConsole = { async render(state, token) {
     const mount = document.getElementById('app');
     mount.innerHTML = '<section class="page"><p>Checking admin access…</p></section>';
@@ -7,17 +27,24 @@
     try { info = await Api.auth('admin', undefined, token); }
     catch (error) {
       if (location.hash !== '#/admin') return;
-      mount.innerHTML = `<section class="page narrow"><span class="eyebrow">ADMINISTRATION</span><h1>Admin access</h1><p>${esc(error.message)}</p><p>Sign in using an account approved by the site owner.</p><div class="admin-tools"><a class="primary-button" href="#/login">Sign in</a><a class="ghost-button" href="#/inventory">Public content inventory</a></div></section>`; return;
+      renderAdminLogin(mount, state, token ? error.message : '');
+      return;
     }
     if (location.hash !== '#/admin') return;
-    mount.innerHTML = `<section class="page admin-page"><div class="page-hero"><span class="eyebrow">HIMANSHU EXAMS · ADMINISTRATION</span><h1>Manage your exam portal</h1><p>Update published content and review registered students.</p></div><div class="admin-console"><aside class="admin-menu"><button data-panel="overview" class="active">Overview</button><button data-panel="validation">Validation</button><button data-panel="content">Exam content</button><button data-panel="students">Students</button><button data-panel="guide">How to use</button><a class="ghost-button" href="#/inventory">Files & diagrams</a><a class="ghost-button" href="#/landing">View website →</a></aside><article class="admin-workspace" id="adminWorkspace"></article></div></section>`;
+    mount.innerHTML = `<section class="admin-standalone"><header class="admin-shell-header"><div><img src="favicon.svg?v=upnaukriguru" alt="" width="48" height="48"><span><strong>UP NaukriGuru Administration</strong><small>Content, validation and student management</small></span></div><div><a class="ghost-button" href="#/landing">Open student site</a><button class="ghost-button" id="adminSignOut" type="button">Sign out</button></div></header><div class="page admin-page"><div class="page-hero compact"><span class="eyebrow">ADMINISTRATION</span><h1>Administration dashboard</h1><p>Manage exam content, validations and student registrations.</p></div><div class="admin-console"><aside class="admin-menu"><button data-panel="overview" class="active">Overview</button><button data-panel="validation">Validation</button><button data-panel="content">Exam content</button><button data-panel="students">Students</button><button data-panel="guide">How to use</button></aside><article class="admin-workspace" id="adminWorkspace"></article></div></div></section>`;
+    document.getElementById('adminSignOut').onclick = () => {
+      sessionStorage.removeItem('he_auth_token');
+      localStorage.removeItem('he_auth_token');
+      location.hash = '#/admin';
+      location.reload();
+    };
     const workspace = document.getElementById('adminWorkspace');
     let dirty = false;
     async function panel(name) {
       if (dirty && !confirm('Discard your unsaved content changes?')) return;
       dirty = false;
       document.querySelectorAll('[data-panel]').forEach(b => b.classList.toggle('active', b.dataset.panel === name));
-      if (name === 'overview') workspace.innerHTML = `<h2>Portal overview</h2><div class="admin-metrics"><article><b>${state.exams.length}</b>Exams</article><article><b>${state.tests.length}</b>Test papers</article><article><b>${info.studentCount}</b>Registered students</article></div><h3>Content workflow</h3><p>Choose a content file, edit its JSON, validate it, then save. Updates go directly to the server. Reload the website after saving to see the latest content.</p><p>Student test attempts and reports currently stay on their device. This dashboard does not collect them.</p>`;
+      if (name === 'overview') workspace.innerHTML = `<h2>Portal overview</h2><div class="admin-metrics"><article><b>${state.exams.length}</b>Exams</article><article><b>${state.tests.length}</b>Test papers</article><article><b>${info.studentCount}</b>Registered students</article></div><h3>Content workflow</h3><p>Use Validation for syllabus and previous-paper records. Use Exam content for broader JSON updates. Changes are backed up before saving.</p>`;
       if (name === 'validation') {
         workspace.innerHTML = '<p>Loading validation queue…</p>';
         try {
@@ -62,7 +89,7 @@
             const pending = rows.filter(item => item.status === 'pending').length;
             const approved = rows.filter(item => item.status === 'approved').length;
             const rejected = rows.filter(item => item.status === 'rejected').length;
-            workspace.innerHTML = `<h2>Content validation</h2><p><b>Edit → Save → Validate.</b> Imported or edited syllabus and previous-paper data stays hidden from students until an approved exam-site admin explicitly approves it.</p><div class="admin-metrics"><article><b>${pending}</b>Pending</article><article><b>${approved}</b>Approved</article><article><b>${rejected}</b>Rejected</article></div><div style="overflow:auto"><table class="admin-table"><thead><tr><th>Type</th><th>Record</th><th>Status</th><th>Validated by</th><th>Actions</th></tr></thead><tbody>${rows.map(item => `<tr><td>${esc(item.kind)}</td><td><strong>${esc(item.title)}</strong><br><small>${esc(item.examId || '')}${item.examDate ? ' · '+esc(item.examDate) : ''}${item.shift ? ' · Shift '+esc(item.shift) : ''}</small></td><td><b>${esc(item.status)}</b></td><td>${esc(item.validatedBy || '—')}</td><td><button class="ghost-button" data-edit-target="${esc(item.target)}" data-edit-id="${esc(item.id)}">Edit</button> <button class="ghost-button" data-validate-target="${esc(item.target)}" data-validate-id="${esc(item.id)}" data-decision="approved">Approve</button> <button class="ghost-button" data-validate-target="${esc(item.target)}" data-validate-id="${esc(item.id)}" data-decision="rejected">Reject</button></td></tr>`).join('') || '<tr><td colspan="5">Nothing to validate.</td></tr>'}</tbody></table></div><p class="admin-status">Approved records are visible to students. Editing an approved record automatically hides it again until re-approved.</p>`;
+            workspace.innerHTML = `<h2>Content validation</h2><p><b>Edit → Save → Validate.</b> Syllabus and previous-paper records are published to students only after approval.</p><div class="admin-metrics"><article><b>${pending}</b>Pending</article><article><b>${approved}</b>Approved</article><article><b>${rejected}</b>Rejected</article></div><div style="overflow:auto"><table class="admin-table"><thead><tr><th>Type</th><th>Record</th><th>Status</th><th>Validated by</th><th>Actions</th></tr></thead><tbody>${rows.map(item => `<tr><td>${esc(item.kind)}</td><td><strong>${esc(item.title)}</strong><br><small>${esc(item.examId || '')}${item.examDate ? ' · '+esc(item.examDate) : ''}${item.shift ? ' · Shift '+esc(item.shift) : ''}</small></td><td><b>${esc(item.status)}</b></td><td>${esc(item.validatedBy || '—')}</td><td><button class="ghost-button" data-edit-target="${esc(item.target)}" data-edit-id="${esc(item.id)}">Edit</button> <button class="ghost-button" data-validate-target="${esc(item.target)}" data-validate-id="${esc(item.id)}" data-decision="approved">Approve</button> <button class="ghost-button" data-validate-target="${esc(item.target)}" data-validate-id="${esc(item.id)}" data-decision="rejected">Reject</button></td></tr>`).join('') || '<tr><td colspan="5">Nothing to validate.</td></tr>'}</tbody></table></div><p class="admin-status">Editing an approved record returns it to Pending until it is approved again.</p>`;
             workspace.querySelectorAll('[data-edit-target]').forEach(button => button.onclick = () => {
               const row = rows.find(item => item.target === button.dataset.editTarget && String(item.id) === String(button.dataset.editId));
               if (row) editRecord(row);
