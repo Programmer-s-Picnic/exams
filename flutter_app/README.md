@@ -1,45 +1,32 @@
-# Himanshu Exams mobile app
+# UP NaukriGuru mobile app
 
-Native Flutter client for Android and iOS.
+Native Flutter student client kept in feature parity with the current UP NaukriGuru student website.
 
-## Features
+## Student features
 
-- Centralized JSON API client using `cserver/exams/json`
-- PHP-backed student registration, login, session restore and logout
-- Google sign-in for both login and account creation
-- Per-account preferences, saved attempt and local result history
-- Website-parity Constable onboarding, dashboard and exam hub
-- Only UP Police Constable selectable; upcoming exams are clearly disabled
-- Official Constable sources, syllabus, recruitment stages and practice area
-- Total-test timed, per-question timed and untimed modes
-- Per-question or end-of-test feedback
-- Question review, negative marking, topic analysis and result summary
-- Shuffled retakes: unanswered, unanswered + wrong, wrong only, or all
-- Dedicated Constable diagnostic with locked timer, marking and feedback rules
-- Diagnostic report card with answer review and preparation focus guidance
-- Responsive Material 3 interface
+- Shared production JSON/API data used by the website
+- Email/mobile registration and login, logout and session restore
+- Google sign-in
+- Exam selection and saved primary exam
+- Dashboard with saved-attempt resume, performance metrics and recommended test
+- UP Police Constable exam hub
+- Official document links
+- Admin-approved syllabus visibility
+- Admin-approved previous-paper visibility
+- Practice and mock-test listing
+- Free diagnostic selection with locked diagnostic rules
+- Diagnostic report with score, accuracy, topic/subject breakdown and focus area
+- Test search and completion filters
+- Total-test timer, per-question timer and untimed practice
+- Immediate feedback or feedback after submission
+- Suggested marks, no-negative-marking mode and custom marking
+- Mark for review and question navigator
+- Automatic attempt saving and resume
+- Result history and detailed answer review
+- Retake unanswered, unanswered + wrong, wrong only, or all questions with fresh shuffling
+- Student How-to guide
+- Profile, change exam, sound preference and logout
 
-## Demo login
+The administration website is intentionally not included in the student APK.
 
-- Email: `student@example.com`
-- Password: `demo123`
-
-## Android build
-
-```bash
-flutter pub get
-flutter analyze
-flutter build apk --release
-```
-
-The Android workflow publishes `releases/himanshu-exams.apk`.
-
-## iOS build
-
-```bash
-flutter pub get
-flutter analyze
-flutter build ios --release
-```
-
-The iOS workflow runs on macOS, creates the native iOS scaffold, verifies the Flutter source and publishes `releases/himanshu-exams-ios-unsigned.zip`. Installing on an iPhone or distributing through TestFlight/App Store requires Apple Developer signing credentials and a provisioning profile.
+The Android workflow publishes the latest build at \`releases/himanshu-exams.apk\`.
