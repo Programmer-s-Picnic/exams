@@ -525,6 +525,66 @@ class _Goals extends State<Goals>{
   );
 }
 
+Map<String,dynamic> normalizeQuestionRecord(Map<String,dynamic> raw){
+  final record=Map<String,dynamic>.from(jsonDecode(jsonEncode(raw)));
+  final examId='${record['examId']??''}';
+  record['id']??=record['documentId']??(record['paper']!=null?'syllabus-$examId':'document-$examId-${record['year']??''}-${record['shift']??''}');
+  record['title']??=record['paper']??'Question set';
+  record['documentType']??=(record['paper']!=null?'syllabus-question-set':'question-set');
+  return record;
+}
+bool approvedQuestionRecord(Map<String,dynamic> raw){
+  final questions=raw['questions'];
+  return raw['adminValidation']?['status']=='approved'&&questions is List&&questions.isNotEmpty;
+}
+Map<String,dynamic>? questionSetTest(Map<String,dynamic> raw){
+  final record=normalizeQuestionRecord(raw);
+  if(!approvedQuestionRecord(record)||record['testEnabled']==false)return null;
+  final questions=List<Map<String,dynamic>>.from(record['questions']);
+  final config=Map<String,dynamic>.from(record['testConfig']??{});
+  final seconds=NumberTools.intValue(config['questionSeconds'],fallback:48);
+  final minutes=NumberTools.intValue(config['durationMinutes'],fallback:max(1,(questions.length*seconds/60).round()));
+  final correct=NumberTools.numValue(config['correctMarks'],fallback:NumberTools.numValue(record['marksPerQuestion'],fallback:2));
+  final wrong=NumberTools.numValue(config['wrongMarks'],fallback:-NumberTools.numValue(record['negativeMarking']));
+  final unanswered=NumberTools.numValue(config['unansweredMarks']);
+  final type='${record['documentType']??'question-set'}';
+  return {
+    'id':'docq-${record['id']}',
+    'baseTestId':'docq-${record['id']}',
+    'type':type.contains('previous')||type.contains('exam-paper')?'previous_year':'question_set',
+    'examId':record['examId'],
+    'examIds':[record['examId']],
+    'documentId':record['id'],
+    'paperId':record['id'],
+    'title':record['title'],
+    'description':record['description']??[
+      record['examDate']??record['year'],
+      record['shift']==null?null:'Shift ${record['shift']}'
+    ].where((x)=>x!=null&&'$x'.isNotEmpty).join(' · '),
+    'category':record['category']??(type.contains('previous')||type.contains('exam-paper')?'Previous Year Paper':'Question Set'),
+    'difficulty':record['difficulty']??'Exam practice',
+    'available':true,
+    'questions':questions.map((q)=>{
+      ...q,
+      'explanation':('${q['explanation']??''}'.trim().isEmpty?'Review the correct answer.':q['explanation'])
+    }).toList(),
+    'totalMarks':questions.fold<num>(0,(sum,q)=>sum+NumberTools.numValue(q['marks'],fallback:correct)),
+    'negativeMarking':wrong<0?-wrong:0,
+    'marking':{'correct':correct,'incorrect':wrong,'unanswered':unanswered},
+    'timing':{'totalSeconds':minutes*60,'questionSeconds':seconds},
+    'defaultMode':config['defaultMode']??'total-timed',
+    'feedbackMode':config['feedbackMode']??'on-completion',
+    'passPercent':NumberTools.intValue(record['passingPercent'],fallback:0),
+  };
+}
+List<Map<String,dynamic>> approvedQuestionRecords(Data d,String examId){
+  final all=<Map<String,dynamic>>[
+    ...d.papers.map(normalizeQuestionRecord),
+    ...d.syllabi.where((s)=>s['questions'] is List).map(normalizeQuestionRecord),
+  ];
+  return all.where((r)=>r['examId']==examId&&approvedQuestionRecord(r)).toList();
+}
+
 class Shell extends StatefulWidget{
   final Data d;final Map<String,dynamic>u;final Set<String>selected;final String primary;final Map<String,dynamic>? launch;
   const Shell({super.key,required this.d,required this.u,required this.selected,required this.primary,this.launch});
@@ -536,10 +596,20 @@ class _Shell extends State<Shell>{
   Map<String,dynamic>? active;
   bool sound=true;
 
-  List<Map<String,dynamic>> get tests=>widget.d.tests.where((t)=>
-    t['available']==true &&
-    List<dynamic>.from(t['examIds']??[t['examId']]).any(widget.selected.contains)
-  ).toList();
+  List<Map<String,dynamic>> get tests{
+    final base=widget.d.tests.where((t)=>
+      t['available']==true &&
+      List<dynamic>.from(t['examIds']??[t['examId']]).any(widget.selected.contains)
+    ).toList();
+    final generated=<Map<String,dynamic>>[];
+    for(final examId in widget.selected){
+      for(final record in approvedQuestionRecords(widget.d,examId)){
+        final test=questionSetTest(record);
+        if(test!=null&&!base.any((t)=>t['id']==test['id'])&&!generated.any((t)=>t['id']==test['id']))generated.add(test);
+      }
+    }
+    return [...base,...generated];
+  }
 
   @override void initState(){
     super.initState();load();
@@ -561,7 +631,7 @@ class _Shell extends State<Shell>{
     final syllabus=syllabusList.isEmpty?<String,dynamic>{'examId':widget.primary,'sections':[]}:syllabusList.first;
     final pages=<Widget>[
       HomePage(u:widget.u,tests:tests,exam:exam,results:results,active:active,reload:load,go:go,sound:sound),
-      ExamHub(exam:exam,syllabus:syllabus,papers:widget.d.papers,tests:tests,results:results,reload:load),
+      ExamHub(exam:exam,syllabus:syllabus,papers:widget.d.papers,tests:tests,results:results,reload:load,sound:sound),
       TestsPage(tests:tests,results:results,reload:load,sound:sound),
       DiagnosticPage(d:widget.d,reload:load,sound:sound),
       ResultsPage(items:results,tests:widget.d.tests,reload:load,sound:sound),
@@ -681,11 +751,15 @@ class ExamHub extends StatelessWidget{
   final List<Map<String,dynamic>>papers,tests;
   final List<dynamic>results;
   final VoidCallback reload;
-  const ExamHub({super.key,required this.exam,required this.syllabus,required this.papers,required this.tests,required this.results,required this.reload});
+  final bool sound;
+  const ExamHub({super.key,required this.exam,required this.syllabus,required this.papers,required this.tests,required this.results,required this.reload,required this.sound});
   Future<void>open(String value)async{
     final uri=Uri.tryParse(value);
     if(uri==null)return;
     if(!await launchUrl(uri,mode:LaunchMode.externalApplication))throw const ApiException('Could not open document.');
+  }
+  void openQuestions(BuildContext c,Map<String,dynamic>record){
+    Navigator.push(c,MaterialPageRoute(builder:(_)=>QuestionDocumentPage(record:normalizeQuestionRecord(record),syllabus:syllabus,reload:reload,sound:sound)));
   }
   @override Widget build(BuildContext c){
     final approved=syllabus['adminValidation']?['status']=='approved';
@@ -693,8 +767,10 @@ class ExamHub extends StatelessWidget{
       ..sort((a,b)=>'${b['examDate']}'.compareTo('${a['examDate']}'));
     final practice=tests.where((t)=>t['type']!='diagnostic'&&List<dynamic>.from(t['examIds']??[]).contains(exam['id'])).toList();
     final latest=results.isEmpty?null:results.first;
+    final syllabusRecord=normalizeQuestionRecord(syllabus);
+    final syllabusQuestions=approvedQuestionRecord(syllabusRecord);
     return ListView(padding:const EdgeInsets.all(18),children:[
-      const Pill('UP POLICE CONSTABLE'),
+      Pill('${exam['name']}'.toUpperCase()),
       const SizedBox(height:8),
       Text('${exam['name']}',style:const TextStyle(fontSize:29,fontWeight:FontWeight.w900)),
       Text('${exam['description']}',style:const TextStyle(color:muted)),
@@ -706,10 +782,10 @@ class ExamHub extends StatelessWidget{
       ]))),
       const TitleText('How to use'),
       const Box(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-        GuideStep(1,'Choose the exam','UP Police Constable must be selected as your preparation goal.'),
-        GuideStep(2,'Review the syllabus','Use the subject and topic outline to plan your preparation.'),
-        GuideStep(3,'Review previous papers','Check the available year and shift information.'),
-        GuideStep(4,'Practise','Use focused practice and mock tests.'),
+        GuideStep(1,'Review the syllabus','Use the subject and topic outline to plan your preparation.'),
+        GuideStep(2,'Open question sets','Validated documents with questions can be read directly in the app.'),
+        GuideStep(3,'Attempt as test','The same questions can be attempted using the test engine.'),
+        GuideStep(4,'Practise','Use focused practice, previous papers and mock tests.'),
         GuideStep(5,'Check results','Review accuracy and weak areas, then retake where needed.'),
       ])),
       const TitleText('Syllabus'),
@@ -729,25 +805,37 @@ class ExamHub extends StatelessWidget{
             ...List<String>.from(section['topics']??[]).map((topic)=>Padding(padding:const EdgeInsets.symmetric(vertical:2),child:Text('• $topic'))),
           ],
         ))),
-        if('${syllabus['source']??''}'.isNotEmpty)OutlinedButton.icon(onPressed:()=>open('${syllabus['source']}'),icon:const Icon(Icons.open_in_new),label:const Text('Open official syllabus')),
+        Wrap(spacing:8,runSpacing:8,children:[
+          if('${syllabus['source']??''}'.isNotEmpty)OutlinedButton.icon(onPressed:()=>open('${syllabus['source']}'),icon:const Icon(Icons.open_in_new),label:const Text('Open official syllabus')),
+          if(syllabusQuestions)OutlinedButton.icon(onPressed:()=>openQuestions(c,syllabusRecord),icon:const Icon(Icons.menu_book_outlined),label:Text('View ${(syllabusRecord['questions']as List).length} questions')),
+          if(syllabusQuestions&&syllabusRecord['testEnabled']!=false)FilledButton.icon(onPressed:(){
+            final t=questionSetTest(syllabusRecord);if(t!=null)instructions(c,t,reload,sound:sound);
+          },icon:const Icon(Icons.play_arrow),label:const Text('Attempt as test')),
+        ]),
       ]else
         const Box(child:Text('Syllabus details will be available shortly.')),
-      const TitleText('Previous papers'),
+      const TitleText('Previous papers and question sets'),
       if(approvedPapers.isEmpty)
         const Box(child:Text('Previous papers will be available shortly.'))
       else
-        ...approvedPapers.map((paper)=>Box(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-          Text('${paper['title']}',style:const TextStyle(fontWeight:FontWeight.w900)),
-          Text('${paper['language']??'Hindi / English'} · ${paper['questionsExpected']??150} questions',style:const TextStyle(color:muted)),
-          const SizedBox(height:8),
-          Wrap(spacing:8,children:[
-            if('${paper['publicSourceUrl']??''}'.isNotEmpty)OutlinedButton(onPressed:()=>open('${paper['publicSourceUrl']}'),child:const Text('Open paper')),
-            if('${paper['officialVerificationUrl']??''}'.isNotEmpty)OutlinedButton(onPressed:()=>open('${paper['officialVerificationUrl']}'),child:const Text('Official notice')),
-          ]),
-        ]))),
+        ...approvedPapers.map((raw){
+          final paper=normalizeQuestionRecord(raw);
+          final count=(paper['questions']as List?)?.length??0;
+          final test=questionSetTest(paper);
+          return Box(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+            Text('${paper['title']}',style:const TextStyle(fontWeight:FontWeight.w900)),
+            Text('${paper['language']??'Hindi / English'} · ${count>0?'$count questions available':'Paper details'}',style:const TextStyle(color:muted)),
+            const SizedBox(height:8),
+            Wrap(spacing:8,runSpacing:8,children:[
+              if(count>0)OutlinedButton.icon(onPressed:()=>openQuestions(c,paper),icon:const Icon(Icons.menu_book_outlined),label:const Text('View questions')),
+              if(test!=null)FilledButton.icon(onPressed:()=>instructions(c,test,reload,sound:sound),icon:const Icon(Icons.play_arrow),label:const Text('Attempt as test')),
+              if('${paper['publicSourceUrl']??''}'.isNotEmpty)OutlinedButton(onPressed:()=>open('${paper['publicSourceUrl']}'),child:const Text('Open document')),
+            ]),
+          ]));
+        }),
       const TitleText('Practice and mock tests'),
       if(practice.isEmpty)const Box(child:Text('Practice tests will appear here when available.'))
-      else ...practice.map((t)=>TestCard(t:t,tap:()=>instructions(c,t,reload))),
+      else ...practice.map((t)=>TestCard(t:t,tap:()=>instructions(c,t,reload,sound:sound))),
       const TitleText('Results and retakes'),
       Box(color:const Color(0xffe8f5ef),child:Text(
         latest==null?'Complete a test to see scoring, explanations and topic analysis.':'${results.length} attempt${results.length==1?'':'s'} · latest score ${latest['percent']}%. Open Results to review and retake.'
@@ -767,6 +855,76 @@ class ExamHub extends StatelessWidget{
     ]);
   }
 }
+
+class QuestionDocumentPage extends StatelessWidget{
+  final Map<String,dynamic>record,syllabus;
+  final VoidCallback reload;
+  final bool sound;
+  const QuestionDocumentPage({super.key,required this.record,required this.syllabus,required this.reload,required this.sound});
+  String subjectLabel(String id){
+    final rows=List<Map<String,dynamic>>.from(syllabus['sections']??[]);
+    final matches=rows.where((s)=>'${s['id']}'==id).toList();
+    return matches.isEmpty?id:'${matches.first['name']}';
+  }
+  String typeLabel(){
+    final type='${record['documentType']??''}'.toLowerCase();
+    if(type.contains('previous'))return 'Previous year paper';
+    if(type.contains('exam-paper'))return 'Exam paper';
+    if(type.contains('syllabus'))return 'Syllabus question set';
+    return 'Question set';
+  }
+  Future<void>openSource()async{
+    final value='${record['publicSourceUrl']??record['source']??''}';
+    if(value.isEmpty)return;
+    final uri=Uri.tryParse(value);if(uri==null)return;
+    await launchUrl(uri,mode:LaunchMode.externalApplication);
+  }
+  @override Widget build(BuildContext c){
+    final questions=List<Map<String,dynamic>>.from(record['questions']??[]);
+    final test=questionSetTest(record);
+    final meta=[
+      record['examDate']??record['year'],
+      record['shift']==null?null:'Shift ${record['shift']}',
+      '${questions.length} questions',
+    ].where((x)=>x!=null&&'$x'.isNotEmpty).join(' · ');
+    return Scaffold(
+      appBar:AppBar(title:Text(typeLabel())),
+      body:ListView(padding:const EdgeInsets.fromLTRB(18,18,18,90),children:[
+        Text('${record['title']}',style:const TextStyle(fontSize:27,fontWeight:FontWeight.w900)),
+        Text(meta,style:const TextStyle(color:muted)),
+        const SizedBox(height:14),
+        Wrap(spacing:8,runSpacing:8,children:[
+          if(test!=null)FilledButton.icon(onPressed:()=>instructions(c,test,reload,sound:sound),icon:const Icon(Icons.play_arrow),label:const Text('Attempt as test')),
+          if('${record['publicSourceUrl']??record['source']??''}'.isNotEmpty)OutlinedButton.icon(onPressed:openSource,icon:const Icon(Icons.open_in_new),label:const Text('Open document')),
+        ]),
+        const TitleText('Questions'),
+        ...questions.asMap().entries.map((entry){
+          final q=entry.value;
+          final subject='${q['subjectId']??''}';
+          return Box(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+            Wrap(spacing:7,runSpacing:5,children:[
+              Chip(label:Text('Q${entry.key+1}')),
+              if(subject.isNotEmpty)Chip(label:Text(subjectLabel(subject))),
+              if('${q['topic']??''}'.isNotEmpty)Chip(label:Text('${q['topic']}')),
+            ]),
+            const SizedBox(height:8),
+            Text('${q['question']}',style:const TextStyle(fontSize:17,fontWeight:FontWeight.w900,height:1.35)),
+            const SizedBox(height:8),
+            ...List<dynamic>.from(q['options']??[]).asMap().entries.map((o)=>Padding(
+              padding:const EdgeInsets.symmetric(vertical:3),
+              child:Text('${String.fromCharCode(65+o.key)}. ${o.value}'),
+            )),
+          ]));
+        }),
+        if(test!=null)...[
+          const SizedBox(height:12),
+          FilledButton(onPressed:()=>instructions(c,test,reload,sound:sound),child:const Text('Attempt this question set →')),
+        ],
+      ]),
+    );
+  }
+}
+
 
 class TestsPage extends StatefulWidget{
   final List<Map<String,dynamic>>tests;final List<dynamic>results;final VoidCallback reload;final bool sound;
@@ -844,9 +1002,9 @@ class GuidePage extends StatelessWidget{
       const Box(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         GuideStep(1,'Choose your examination','Sign in and select the examination you want to focus on.'),
         GuideStep(2,'Review the syllabus','Use the exam page to understand subjects and topics.'),
-        GuideStep(3,'Review previous papers','Use available year and shift information to understand the paper structure.'),
+        GuideStep(3,'Review previous papers','Open validated question sets to read every available question and option.'),
         GuideStep(4,'Practise by subject and topic','Use focused practice before attempting longer tests.'),
-        GuideStep(5,'Take mock and diagnostic tests','Read the instructions and use the appropriate timing and feedback mode.'),
+        GuideStep(5,'Attempt question sets and tests','Validated question sets can be attempted through the same timer, autosave, review and result system.'),
         GuideStep(6,'Check your results','Review score, accuracy, unanswered questions and topic performance.'),
         GuideStep(7,'Retake weak areas','Retake wrong, unanswered or all questions with fresh shuffling where supported.'),
         GuideStep(8,'Resume saved attempts','Active attempts are saved automatically on this device.'),
