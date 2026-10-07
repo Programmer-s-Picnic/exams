@@ -1,7 +1,7 @@
 (function () {
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   function renderAdminLogin(mount, state, message = '') {
-    mount.innerHTML = `<section class="admin-standalone"><div class="admin-login-card"><img src="favicon.svg?v=upnaukriguru" alt="" width="64" height="64"><span class="eyebrow">UP NAUKRIGURU ADMINISTRATION</span><h1>Admin sign in</h1><p>Use an authorised administrator account.</p>${message ? `<p class="form-error">${esc(message)}</p>` : ''}<label>Email or mobile<input id="adminLoginId" autocomplete="username"></label><label>Password<input id="adminLoginPassword" type="password" autocomplete="current-password"></label><button class="primary-button full" id="adminLoginButton">Sign in</button><p class="admin-status" id="adminLoginStatus"></p></div></section>`;
+    mount.innerHTML = `<section class="admin-standalone"><div class="admin-login-card"><img src="favicon.svg?v=upnaukriguru" alt="" width="64" height="64"><span class="eyebrow">UP NAUKRIGURU ADMINISTRATION</span><h1>Admin sign in</h1><p>Use an authorised administrator account.</p>${message ? `<p class="form-error">${esc(message)}</p>` : ''}<label>Username<input id="adminLoginId" autocomplete="username" value="admin"></label><label>Password<input id="adminLoginPassword" type="password" autocomplete="current-password" value="admin"></label><button class="primary-button full" id="adminLoginButton">Sign in</button><p class="admin-status" id="adminLoginStatus"></p></div></section>`;
     const button = document.getElementById('adminLoginButton');
     button.onclick = async () => {
       const login = document.getElementById('adminLoginId').value.trim();
@@ -10,9 +10,8 @@
       if (!login || !password) { status.textContent = 'Enter your login and password.'; return; }
       button.disabled = true; status.textContent = 'Signing in…';
       try {
-        const result = await Api.auth('login', {login, password});
-        sessionStorage.setItem('he_auth_token', result.token);
-        localStorage.removeItem('he_auth_token');
+        const result = await Api.auth('admin', {action:'temporary-login', username:login, password});
+        sessionStorage.setItem('he_admin_token', result.token);
         await window.AdminConsole.render(state, result.token);
       } catch (error) {
         status.textContent = error.message;
@@ -33,8 +32,7 @@
     if (location.hash !== '#/admin') return;
     mount.innerHTML = `<section class="admin-standalone"><header class="admin-shell-header"><div><img src="favicon.svg?v=upnaukriguru" alt="" width="48" height="48"><span><strong>UP NaukriGuru Administration</strong><small>Content, validation and student management</small></span></div><div><a class="ghost-button" href="#/landing">Open student site</a><button class="ghost-button" id="adminSignOut" type="button">Sign out</button></div></header><div class="page admin-page"><div class="page-hero compact"><span class="eyebrow">ADMINISTRATION</span><h1>Administration dashboard</h1><p>Manage exam content, validations and student registrations.</p></div><div class="admin-console"><aside class="admin-menu"><button data-panel="overview" class="active">Overview</button><button data-panel="validation">Validation</button><button data-panel="content">Exam content</button><button data-panel="students">Students</button><button data-panel="guide">How to use</button></aside><article class="admin-workspace" id="adminWorkspace"></article></div></div></section>`;
     document.getElementById('adminSignOut').onclick = () => {
-      sessionStorage.removeItem('he_auth_token');
-      localStorage.removeItem('he_auth_token');
+      sessionStorage.removeItem('he_admin_token');
       location.hash = '#/admin';
       location.reload();
     };

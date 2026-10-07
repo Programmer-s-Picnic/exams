@@ -169,7 +169,7 @@
       register: renderRegister,
       home: renderDashboard,
       constable: renderConstable,
-      admin: () => AdminConsole.render(state, authToken()),
+      admin: () => AdminConsole.render(state, sessionStorage.getItem('he_admin_token') || ''),
       inventory: () => { location.hash = '#/admin'; },
       onboarding: renderOnboarding,
       tests: renderTests,
