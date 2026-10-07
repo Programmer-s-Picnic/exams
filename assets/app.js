@@ -169,6 +169,7 @@
       register: renderRegister,
       home: renderDashboard,
       constable: renderConstable,
+      paper: () => renderPaper(id),
       admin: () => AdminConsole.render(state, sessionStorage.getItem('he_admin_token') || ''),
       inventory: () => { location.hash = '#/admin'; },
       onboarding: renderOnboarding,
@@ -566,6 +567,72 @@
     } catch (error) { mount.innerHTML = `<section class="page"><div class="error-state"><h1>Content inventory unavailable</h1><p>Please try again later.</p></div></section>`; }
   }
 
+  function approvedPaper(id) {
+    return state.papers.find(item => item.id === id && item.adminValidation?.status === 'approved' && Array.isArray(item.questions) && item.questions.length);
+  }
+
+  function paperTestFromPaper(paper) {
+    if (!paper || !Array.isArray(paper.questions) || !paper.questions.length) return null;
+    const perQuestionSeconds = 48;
+    const durationMinutes = Number(paper.durationMinutes) || Math.max(1, Math.round(paper.questions.length * perQuestionSeconds / 60));
+    const correct = Number(paper.marksPerQuestion ?? 2);
+    const incorrect = -Math.abs(Number(paper.negativeMarking ?? 0));
+    return {
+      id: `pyq-${paper.id}`,
+      baseTestId: `pyq-${paper.id}`,
+      type: 'previous_year',
+      examId: paper.examId,
+      examIds: [paper.examId],
+      paperId: paper.id,
+      title: paper.title,
+      description: `Previous-year paper · ${paper.examDate || paper.year} · Shift ${paper.shift || ''}`,
+      category: 'Previous Year Paper',
+      difficulty: 'Previous year',
+      icon: 'test',
+      available: true,
+      questions: paper.questions.map(question => ({ ...question, explanation: question.explanation || 'Review the correct answer.' })),
+      totalMarks: paper.questions.reduce((sum, question) => sum + Number(question.marks ?? correct), 0),
+      negativeMarking: Math.abs(incorrect),
+      marking: { correct, incorrect, unanswered: 0 },
+      timing: { totalSeconds: durationMinutes * 60, questionSeconds: perQuestionSeconds },
+      defaultMode: 'total-timed',
+      feedbackMode: 'on-completion',
+      passingPercent: 0
+    };
+  }
+
+  function findTest(id) {
+    const stored = state.tests.find(item => item.id === id);
+    if (stored) return stored;
+    if (id?.startsWith('pyq-')) return paperTestFromPaper(approvedPaper(id.slice(4)));
+    return null;
+  }
+
+  function renderPaper(id) {
+    if (!state.user || state.preferences.primary !== 'up-police') { location.hash = '#/constable'; return; }
+    const paper = approvedPaper(id);
+    if (!paper) return notFound('Question paper is not available');
+    const test = paperTestFromPaper(paper);
+    const date = paper.examDate ? new Date(`${paper.examDate}T00:00:00`).toLocaleDateString('en-IN', { day:'numeric', month:'long', year:'numeric' }) : paper.year;
+    const subjectLabel = subjectId => ({
+      'numerical':'Numerical and Mental Ability',
+      'general-knowledge':'General Knowledge',
+      'hindi':'General Hindi',
+      'reasoning':'Mental Aptitude, I.Q. and Reasoning'
+    }[subjectId] || subjectId || 'Question');
+    document.getElementById('app').innerHTML = `
+      <section class="page paper-page">
+        <a class="back-link" href="#/constable">← Previous papers</a>
+        <div class="page-hero compact"><span class="eyebrow">PREVIOUS YEAR PAPER</span><h1>${escapeHtml(paper.title)}</h1><p>${escapeHtml(date)} · Shift ${escapeHtml(paper.shift)} · ${paper.questions.length} questions available</p></div>
+        <div class="paper-actions"><a class="primary-button" href="#/instructions/${encodeURIComponent(test.id)}">Attempt as test →</a><a class="ghost-button" href="#paperQuestions">View questions</a>${paper.publicSourceUrl ? `<a class="ghost-button" href="${escapeHtml(paper.publicSourceUrl)}" target="_blank" rel="noopener noreferrer">Open document ↗</a>` : ''}</div>
+        <div class="paper-summary"><article><strong>${paper.questions.length}</strong><span>Questions</span></article><article><strong>${test.totalMarks}</strong><span>Marks</span></article><article><strong>${Math.round(test.timing.totalSeconds/60)} min</strong><span>Test time</span></article><article><strong>${test.marking.incorrect}</strong><span>Wrong answer</span></article></div>
+        <section id="paperQuestions" class="paper-question-list"><div class="section-heading"><div><span class="eyebrow">QUESTION PAPER</span><h2>Questions</h2></div></div>
+          ${paper.questions.map((question,index)=>`<article class="paper-question"><div class="paper-question-number">${index+1}</div><div><span class="tag-row"><i>${escapeHtml(subjectLabel(question.subjectId))}</i><i>${escapeHtml(question.topic || '')}</i></span><h3>${escapeHtml(question.question)}</h3><ol type="A">${question.options.map(option=>`<li>${escapeHtml(option)}</li>`).join('')}</ol></div></article>`).join('')}
+        </section>
+        <div class="paper-bottom-action"><a class="primary-button" href="#/instructions/${encodeURIComponent(test.id)}">Attempt this paper as a test →</a></div>
+      </section>`;
+  }
+
   function renderConstable() {
     if (!state.user) {
       sessionStorage.setItem('he_after_login', '#/constable');
@@ -595,13 +662,14 @@
     const paperCard = paper => {
       const date = paper.examDate ? new Date(`${paper.examDate}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : paper.year;
       const badge = paper.series === 'latest-exam' ? 'LATEST EXAM PAPER' : 'PREVIOUS YEAR PAPER';
-      const sourceLink = paper.publicSourceUrl ? `<a class="ghost-button" href="${escapeHtml(paper.publicSourceUrl)}" target="_blank" rel="noopener noreferrer">Government paper ↗</a>` : '';
-      const officialNotice = paper.officialVerificationUrl ? `<a class="ghost-button" href="${escapeHtml(paper.officialVerificationUrl)}" target="_blank" rel="noopener noreferrer">Official notice ↗</a>` : '';
+      const count = Array.isArray(paper.questions) ? paper.questions.length : 0;
+      const sourceLink = paper.publicSourceUrl ? `<a class="ghost-button" href="${escapeHtml(paper.publicSourceUrl)}" target="_blank" rel="noopener noreferrer">Open document ↗</a>` : '';
+      const questionActions = count ? `<a class="ghost-button" href="#/paper/${encodeURIComponent(paper.id)}">View questions</a><a class="primary-button" href="#/instructions/${encodeURIComponent('pyq-'+paper.id)}">Attempt as test →</a>` : '';
       return `<article class="hub-tile">
         <small>${badge}</small>
         <h3>${escapeHtml(date)} · Shift ${escapeHtml(paper.shift)}</h3>
-        <p>${escapeHtml(paper.language || 'Hindi / English')} · ${escapeHtml(paper.questionsExpected || 150)} questions</p>
-        ${sourceLink || officialNotice ? `<div class="document-actions">${sourceLink}${officialNotice}</div>` : ''}
+        <p>${escapeHtml(paper.language || 'Hindi / English')} · ${count ? count+' questions available' : 'Paper details'}</p>
+        ${sourceLink || questionActions ? `<div class="document-actions">${questionActions}${sourceLink}</div>` : ''}
       </article>`;
     };
 
@@ -761,8 +829,8 @@
   }
 
   function renderInstructions(id) {
-    const test = state.tests.find(item => item.id === id);
-    if (!test || !test.available) return notFound('This test is coming soon');
+    const test = findTest(id);
+    if (!test || !test.available) return notFound('This test is not available');
     if (test.type === 'diagnostic') return renderDiagnosticInstructions(test);
     document.getElementById('app').innerHTML = `
       <section class="page narrow">
@@ -830,8 +898,8 @@
   }
 
   function beginAttempt(id) {
-    const test = state.tests.find(item => item.id === id);
-    if (!test || !test.available) return notFound('This test is coming soon');
+    const test = findTest(id);
+    if (!test || !test.available) return notFound('This test is not available');
     const saved = TestEngine.activeAttempt();
     const settings = readSession('he_test_settings') || {};
     TestEngine.start(test, { ...settings, sound: state.sound }, saved?.testId === id ? saved : null);
@@ -850,7 +918,7 @@
 
   function renderResult(id) {
     const result = TestEngine.getResults().find(item => item.id === id);
-    const test = state.tests.find(item => item.id === result?.testId) || state.tests.find(item => item.id === result?.baseTestId);
+    const test = findTest(result?.testId) || findTest(result?.baseTestId);
     if (!result || !test) return notFound('Result not found');
     if (result.type === 'diagnostic') return renderDiagnosticResult(result, test);
     const circumference = 339.3;
@@ -867,7 +935,7 @@
           const percent = Math.round(scores.correct / scores.total * 100);
           return `<div class="topic-row"><span><strong>${topic}</strong><small>${scores.correct}/${scores.total} correct</small></span><div><i style="width:${percent}%"></i></div><b>${percent}%</b></div>`;
         }).join('')}</article>
-        <div class="result-actions"><a class="ghost-button" href="#/tests">More tests</a><a class="primary-button" href="#/review/${result.id}">Review answers →</a></div>
+        <div class="result-actions"><a class="ghost-button" href="${test.type === 'previous_year' ? '#/paper/'+encodeURIComponent(test.paperId) : '#/tests'}">${test.type === 'previous_year' ? 'Back to paper' : 'More tests'}</a><a class="primary-button" href="#/review/${result.id}">Review answers →</a></div>
         <section class="analysis-card"><h2>Retake questions</h2><p>Questions and options are reshuffled for each retake.</p><div class="result-actions retake-actions">${[['unanswered','Unanswered only'],['review','Unanswered + wrong'],['wrong','Wrong only'],['all','All questions']].map(([mode,label]) => `<button class="ghost-button" data-retake="${mode}" ${mode !== 'all' && !retakeQuestions(test, result, mode).length ? 'disabled' : ''}>${label} (${retakeQuestions(test, result, mode).length})</button>`).join('')}</div></section>
       </section>`;
     document.querySelectorAll('[data-retake]').forEach(button => button.addEventListener('click', () => startRetake(test, result, button.dataset.retake)));
@@ -898,7 +966,7 @@
       return { ...question, options: options.map(item => item.option), correctOption: options.findIndex(item => item.index === question.correctOption) };
     }));
     const baseTestId = result.baseTestId || test.id;
-    const original = state.tests.find(item => item.id === baseTestId) || test;
+    const original = findTest(baseTestId) || test;
     const retake = { ...test, id: `${baseTestId}~${Date.now()}`, baseTestId, title: `${original.title} — retake`, questions, totalMarks: questions.reduce((sum, question) => sum + Number(question.marks || 1), 0), timing: { ...test.timing, totalSeconds: Math.max(60, Math.round(original.timing.totalSeconds * questions.length / original.questions.length)) } };
     state.tests.push(retake);
     sessionStorage.setItem('he_retake', JSON.stringify(retake));
@@ -907,7 +975,7 @@
 
   function renderReview(id) {
     const result = TestEngine.getResults().find(item => item.id === id);
-    const test = state.tests.find(item => item.id === result?.testId) || state.tests.find(item => item.id === result?.baseTestId);
+    const test = findTest(result?.testId) || findTest(result?.baseTestId);
     if (!result || !test) return notFound('Review not found');
     document.getElementById('app').innerHTML = `
       <section class="page narrow">
