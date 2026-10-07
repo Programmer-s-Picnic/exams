@@ -1,7 +1,7 @@
 name: himanshu_exams
 description: Native Android exam preparation app for UP NaukriGuru.
 publish_to: none
-version: 1.5.1+10
+version: 1.5.2+11
 
 environment:
   sdk: '>=3.3.0 <4.0.0'

@@ -115,6 +115,37 @@ class Store{
   static Future<void> del(String k)async=>(await p).remove(key(k));
 }
 
+
+Future<List<dynamic>> syncResultsWithServer(List<dynamic> local)async{
+  final token=await Store.string('token');
+  if(token==null)return local;
+  try{
+    if(local.isNotEmpty){
+      await Api.auth('results',body:{'results':local.take(100).toList()},token:token);
+    }
+    final remote=await Api.auth('results',token:token);
+    final merged=<String,Map<String,dynamic>>{};
+    for(final raw in [...local,...List<dynamic>.from(remote['results']??[])]){
+      if(raw is! Map)continue;
+      final row=Map<String,dynamic>.from(raw);
+      final id='${row['id']??''}';
+      if(id.isEmpty)continue;
+      final current=merged[id];
+      if(current==null||'${row['date']??''}'.compareTo('${current['date']??''}')>=0)merged[id]=row;
+    }
+    final rows=merged.values.toList()
+      ..sort((a,b)=>'${b['date']??''}'.compareTo('${a['date']??''}'));
+    return rows.take(500).toList();
+  }catch(_){
+    return local;
+  }
+}
+Future<void>saveResultToServer(Map<String,dynamic> result)async{
+  final token=await Store.string('token');
+  if(token==null)return;
+  try{await Api.auth('results',body:{'result':result},token:token);}catch(_){}
+}
+
 class Data{
   final Map<String,dynamic> config;
   final List<Map<String,dynamic>> exams,tests,syllabi,papers;
@@ -617,7 +648,9 @@ class _Shell extends State<Shell>{
     if(widget.launch!=null)WidgetsBinding.instance.addPostFrameCallback((_){instructions(context,widget.launch!,load,sound:sound);});
   }
   Future<void>load()async{
-    final r=await Store.list('results');
+    final local=await Store.list('results');
+    final r=await syncResultsWithServer(local);
+    if(r.length!=local.length||jsonEncode(r)!=jsonEncode(local))await Store.set('results',r);
     final a=await Store.map('active');
     final s=await Store.boolValue('sound');
     if(mounted)setState(() { results=r; active=a; sound=s; });
@@ -1021,7 +1054,7 @@ class GuidePage extends StatelessWidget{
         GuideStep(3,'Review previous papers','Open validated question sets to read every available question and option.'),
         GuideStep(4,'Practise by subject and topic','Use focused practice before attempting longer tests.'),
         GuideStep(5,'Attempt question sets and tests','Validated question sets can be attempted through the same timer, autosave, review and result system.'),
-        GuideStep(6,'Check your results','Review score, accuracy, unanswered questions and topic performance.'),
+        GuideStep(6,'Check your results','Completed results are saved to your account and synced across the website and app.'),
         GuideStep(7,'Retake weak areas','Retake wrong, unanswered or all questions with fresh shuffling where supported.'),
         GuideStep(8,'Resume saved attempts','Active attempts are saved automatically on this device.'),
       ])),
@@ -1308,7 +1341,8 @@ class _TestPage extends State<TestPage>{
     };
     final all=await Store.list('results');
     all.insert(0,result);
-    await Store.set('results',all.take(50).toList());
+    await Store.set('results',all.take(500).toList());
+    await saveResultToServer(result);
     await Store.del('active');
     widget.done();
     if(mounted)Navigator.pushReplacement(context,MaterialPageRoute(builder:(_)=>ResultPage(t:widget.t,r:Map<String,dynamic>.from(result),done:widget.done,sound:widget.sound)));
@@ -1527,7 +1561,7 @@ class ResultsPage extends StatelessWidget{
     if(items.isEmpty)return const Center(child:Padding(padding:EdgeInsets.all(24),child:Text('Complete a test to begin measuring progress.')));
     return ListView(padding:const EdgeInsets.all(18),children:[
       const Text('Your results',style:TextStyle(fontSize:28,fontWeight:FontWeight.w900)),
-      const Text('Use every result to decide what to practise next.',style:TextStyle(color:muted)),
+      const Text('Results are saved to your account and available on your signed-in devices.',style:TextStyle(color:muted)),
       const SizedBox(height:14),
       ...items.map((raw){
         final r=Map<String,dynamic>.from(raw);
