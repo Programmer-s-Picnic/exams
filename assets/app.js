@@ -581,8 +581,9 @@
     const syllabus = state.syllabus.find(item => item.examId === exam?.id);
     if (!exam || !syllabus) return notFound('Constable information is unavailable');
 
+    const syllabusApproved = syllabus.adminValidation?.status === 'approved';
     const papers = state.papers
-      .filter(item => item.examId === exam.id)
+      .filter(item => item.examId === exam.id && item.adminValidation?.status === 'approved')
       .sort((a, b) => String(b.examDate || '').localeCompare(String(a.examDate || '')) || Number(a.shift || 0) - Number(b.shift || 0));
     const paperYears = [...new Set(papers.map(item => item.year))].sort((a, b) => Number(b) - Number(a));
     const tests = state.tests.filter(test => test.id.startsWith('up-police-constable-') && !test.baseTestId);
@@ -593,14 +594,13 @@
     const paperCard = paper => {
       const date = paper.examDate ? new Date(`${paper.examDate}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : paper.year;
       const badge = paper.series === 'latest-exam' ? 'LATEST EXAM PAPER' : 'PREVIOUS YEAR PAPER';
+      const sourceLink = paper.publicSourceUrl ? `<a class="ghost-button" href="${escapeHtml(paper.publicSourceUrl)}" target="_blank" rel="noopener noreferrer">Government paper ↗</a>` : '';
+      const officialNotice = paper.officialVerificationUrl ? `<a class="ghost-button" href="${escapeHtml(paper.officialVerificationUrl)}" target="_blank" rel="noopener noreferrer">Official notice ↗</a>` : '';
       return `<article class="hub-tile">
-        <small>${badge} · VERIFIED ${escapeHtml(paper.verifiedAt || '')}</small>
+        <small>${badge} · ADMIN VALIDATED</small>
         <h3>${escapeHtml(date)} · Shift ${escapeHtml(paper.shift)}</h3>
         <p>${escapeHtml(paper.language || 'Hindi / English')} · ${escapeHtml(paper.questionsExpected || 150)} questions</p>
-        <div class="document-actions">
-          <a class="ghost-button" href="${escapeHtml(paper.paperUrl)}" target="_blank" rel="noopener noreferrer">Open paper PDF ↗</a>
-          <a class="ghost-button" href="${escapeHtml(paper.officialVerificationUrl)}" target="_blank" rel="noopener noreferrer">Official verification ↗</a>
-        </div>
+        ${sourceLink || officialNotice ? `<div class="document-actions">${sourceLink}${officialNotice}</div>` : ''}
       </article>`;
     };
 
@@ -625,21 +625,23 @@
 
         <section class="hub-section" id="constable-syllabus">
           <h2>Verified official syllabus</h2>
-          <p>${escapeHtml(syllabus.note)}</p>
-          <div class="hub-grid">
-            <article class="hub-tile"><small>PAPER SIZE</small><h3>${escapeHtml(syllabus.totalQuestions || 150)} questions</h3><p>${escapeHtml(syllabus.totalMarks || 300)} maximum marks</p></article>
-            <article class="hub-tile"><small>DURATION</small><h3>${escapeHtml(syllabus.durationMinutes || 120)} minutes</h3><p>Objective written examination</p></article>
-            <article class="hub-tile"><small>SCORING</small><h3>+${escapeHtml(syllabus.marksPerCorrect || 2)} correct</h3><p>${syllabus.negativeMarking ? 'Negative marking applies' : 'No negative marking'}</p></article>
-            <article class="hub-tile"><small>SOURCE</small><h3>UPPRPB official notification</h3><p>Appendix 1 · pages ${escapeHtml((syllabus.sourcePages || []).join('–'))}</p><a class="ghost-button" href="${escapeHtml(syllabus.source)}" target="_blank" rel="noopener noreferrer">Open syllabus source ↗</a></article>
-          </div>
-          <div class="hub-grid">${syllabus.sections.map(section => `<article class="hub-tile"><h3>${escapeHtml(section.name)}</h3><ul>${section.topics.map(topic => `<li>${escapeHtml(topic)}</li>`).join('')}</ul></article>`).join('')}</div>
+          ${syllabusApproved ? `
+            <p>${escapeHtml(syllabus.note)}</p>
+            <div class="hub-grid">
+              <article class="hub-tile"><small>PAPER SIZE</small><h3>${escapeHtml(syllabus.totalQuestions || 150)} questions</h3><p>${escapeHtml(syllabus.totalMarks || 300)} maximum marks</p></article>
+              <article class="hub-tile"><small>DURATION</small><h3>${escapeHtml(syllabus.durationMinutes || 120)} minutes</h3><p>Objective written examination</p></article>
+              <article class="hub-tile"><small>SCORING</small><h3>+${escapeHtml(syllabus.marksPerCorrect || 2)} correct</h3><p>${syllabus.negativeMarking ? 'Negative marking applies' : 'No negative marking'}</p></article>
+              <article class="hub-tile"><small>SOURCE</small><h3>UPPRPB official notification</h3><p>Appendix 1 · pages ${escapeHtml((syllabus.sourcePages || []).join('–'))}</p><a class="ghost-button" href="${escapeHtml(syllabus.source)}" target="_blank" rel="noopener noreferrer">Open government source ↗</a></article>
+            </div>
+            <div class="hub-grid">${syllabus.sections.map(section => `<article class="hub-tile"><h3>${escapeHtml(section.name)}</h3><ul>${section.topics.map(topic => `<li>${escapeHtml(topic)}</li>`).join('')}</ul></article>`).join('')}</div>
+          ` : '<p>The syllabus is being reviewed by the exam-site admin before publication.</p>'}
         </section>
 
         <section class="hub-section" id="constable-papers">
-          <h2>Verified previous question papers</h2>
-          <p>${papers.length} shift-wise papers are catalogued. Each entry keeps the downloadable paper copy separate from the UPPRPB notice used to verify the examination date and shift.</p>
-          ${paperGroups || '<p>No verified papers are available yet.</p>'}
-          <p class="diagnostic-note">Paper PDFs may be hosted by independent archives. “Official verification” always opens the corresponding UPPRPB notice; archive publishers are not presented as the recruitment board.</p>
+          <h2>Previous question papers</h2>
+          <p>${papers.length ? `${papers.length} exam-site-admin validated shift-wise paper records are available.` : 'Previous paper data is being reviewed by the exam-site admin before publication.'}</p>
+          ${paperGroups}
+          <p class="diagnostic-note">Source links are shown only when they lead to a government document or an archived copy of an original government URL.</p>
         </section>
 
         <section class="hub-section" id="constable-practice"><h2>Subject practice and sample mock</h2><p>Try short subject exercises or a mixed sample. The verified syllabus and previous papers above will be used to expand topic practice and full-length mocks.</p><div class="test-list">${tests.map(test => testCard(test, results)).join('') || '<p>No practice tests are available yet.</p>'}</div></section>
