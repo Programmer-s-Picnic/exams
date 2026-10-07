@@ -465,7 +465,7 @@
           <a href="#/tests"><span>${icon('test')}</span><strong>Start a test</strong><small>Browse available practice</small></a>
           <a href="#/results"><span>${icon('chart')}</span><strong>Performance</strong><small>Review recent attempts</small></a>
           <a href="#/onboarding"><span>${icon('land')}</span><strong>Exam goals</strong><small>Update your targets</small></a>
-          <a href="#/help"><span>${icon('teacher')}</span><strong>Help centre</strong><small>Understand test modes</small></a>
+          <a href="#/help"><span>${icon('teacher')}</span><strong>How to use</strong><small>Follow the student workflow</small></a>
         </div>
       </section>`;
     const focusCard = document.getElementById('primaryExamCard');
@@ -614,13 +614,27 @@
       <section class="page constable-hub">
         <a class="back-link" href="#/home">← Dashboard</a>
         <div class="page-hero"><span class="eyebrow">YOUR EXAM</span><h1>${escapeHtml(exam.name)}</h1><p>${escapeHtml(exam.description)}</p><small>Sources checked ${escapeHtml(exam.verifiedAt)} · Preparation content is independent of the recruitment board.</small></div>
-        <nav class="hub-nav" aria-label="Constable sections">${[['overview','Overview'],['syllabus','Syllabus'],['papers','Previous papers'],['practice','Practice'],['settings','Test modes'],['results','Results'],['stages','Stages']].map(([id,label]) => `<button type="button" data-hub-section="constable-${id}">${label}</button>`).join('')}</nav>
+        <nav class="hub-nav" aria-label="Constable sections">${[['overview','Overview'],['howto','How to use'],['syllabus','Syllabus'],['papers','Previous papers'],['practice','Practice'],['settings','Test modes'],['results','Results'],['stages','Stages']].map(([id,label]) => `<button type="button" data-hub-section="constable-${id}">${label}</button>`).join('')}</nav>
 
         <section class="hub-section" id="constable-overview">
           <h2>Exam overview and official documents</h2>
           <p>Read the current notification and examination-process notice before relying on recruitment dates, eligibility or scoring rules. Select a document to view it below.</p>
           <div class="hub-grid">${exam.sources.map((source, index) => `<div class="hub-tile"><strong>${escapeHtml(source.label)}</strong><div class="document-actions"><button class="ghost-button" type="button" data-document="${index}">View here</button><a class="ghost-button" href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">Open original ↗</a></div></div>`).join('')}</div>
           <div id="officialDocument" class="document-frame" hidden><div class="document-heading"><strong id="documentTitle"></strong><a id="documentOriginal" href="#" target="_blank" rel="noopener noreferrer">Open original ↗</a></div><iframe id="documentIframe" title="Official Constable document" loading="lazy" referrerpolicy="no-referrer"></iframe><p>Preview unavailable? Use “Open original” above. Official websites can prevent embedding.</p></div>
+        </section>
+
+        <section class="hub-section" id="constable-howto">
+          <h2>How to use this exam page</h2>
+          <div class="hub-grid">
+            <article class="hub-tile"><small>STEP 1</small><h3>Choose the exam</h3><p>Sign in and select UP Police Constable as your primary exam. This page is available only after exam selection.</p></article>
+            <article class="hub-tile"><small>STEP 2</small><h3>Read the validated syllabus</h3><p>Use the Syllabus section to see admin-reviewed subjects and topics. Government source links are shown when available.</p></article>
+            <article class="hub-tile"><small>STEP 3</small><h3>Use previous-paper data</h3><p>Only exam-site-admin approved paper records appear here. A source is shown only when it is a government document or an archive of an original government URL.</p></article>
+            <article class="hub-tile"><small>STEP 4</small><h3>Practise topic-wise</h3><p>Choose focused practice to answer questions with the configured feedback mode and review weak areas.</p></article>
+            <article class="hub-tile"><small>STEP 5</small><h3>Take timed tests</h3><p>Use the available mock or diagnostic tests. Read the instructions before starting because timer and marking rules may be fixed.</p></article>
+            <article class="hub-tile"><small>STEP 6</small><h3>Review and retake</h3><p>Open Results to see scores and topic performance, then retake all, wrong, unanswered, or wrong-and-unanswered questions where supported.</p></article>
+          </div>
+          <p class="diagnostic-note">“Admin validated” means an approved exam-site administrator reviewed the record before it was published. It does not mean the preparation website is affiliated with UPPRPB.</p>
+          <a class="ghost-button" href="#/help">Open full student guide →</a>
         </section>
 
         <section class="hub-section" id="constable-syllabus">
@@ -943,14 +957,20 @@
   function renderHelp() {
     document.getElementById('app').innerHTML = `
       <section class="page narrow">
-        <div class="page-hero compact"><span class="eyebrow">HELP CENTRE</span><h1>How Himanshu Exams works</h1><p>Simple answers for a focused testing experience.</p></div>
+        <div class="page-hero compact"><span class="eyebrow">STUDENT GUIDE</span><h1>How to use Himanshu Exams</h1><p>Use this sequence to move from exam selection to focused improvement.</p></div>
         <div class="faq-list">
-          <details open><summary>Are my answers saved?</summary><p>Yes. Active attempts are saved automatically in this browser and can be resumed from the dashboard.</p></details>
-          <details><summary>What is a total-test timer?</summary><p>One countdown covers the entire test. The test submits automatically when it reaches zero.</p></details>
-          <details><summary>What is a per-question timer?</summary><p>Every question receives its own countdown. When time ends, the test automatically moves to the next question.</p></details>
-          <details><summary>When are answers checked?</summary><p>You may choose immediate checking after every question or keep answers hidden until final submission.</p></details>
-          <details><summary>How do I sign in?</summary><p>Register with your email and mobile number, then sign in with your password. Sign out from your profile.</p></details>
+          <details open><summary>1. How do I start?</summary><p>Sign in, choose your target examination and set a primary exam. For the current release, select UP Police Constable to open its exam hub.</p></details>
+          <details><summary>2. Where should I check the syllabus?</summary><p>Open your exam page and use the Syllabus section. Imported syllabus content is shown only after exam-site-admin validation. Government source links are displayed when available.</p></details>
+          <details><summary>3. How do previous-year papers work?</summary><p>The Previous papers section shows only admin-approved records. A public source link is displayed only for a government document or a Wayback copy of an original government URL. Other approved paper data may appear without a source label.</p></details>
+          <details><summary>4. How should I use practice tests?</summary><p>Use topic or subject practice for focused revision. Depending on the test, answers may be checked instantly or after final submission.</p></details>
+          <details><summary>5. What is a total-test timer?</summary><p>One countdown covers the entire test. The test submits automatically when it reaches zero.</p></details>
+          <details><summary>6. What is a per-question timer?</summary><p>Every question receives its own countdown. When time ends, the test automatically moves to the next question.</p></details>
+          <details><summary>7. Are my answers saved?</summary><p>Yes. Active attempts are saved automatically in this browser and can be resumed from the dashboard.</p></details>
+          <details><summary>8. How do I improve after a test?</summary><p>Open Results, review wrong and unanswered questions, inspect topic performance and use the available retake filters to practise the areas that need work.</p></details>
+          <details><summary>9. What does “Admin validated” mean?</summary><p>It means an approved exam-site administrator reviewed that imported record before publication. Editing an approved record hides it again until it is revalidated.</p></details>
+          <details><summary>10. Are official links always shown?</summary><p>Only government documents or archived copies of original government URLs are shown as public sources. The platform is an independent preparation service and is not the recruitment board.</p></details>
         </div>
+        <div class="result-actions"><a class="primary-button" href="#/constable">Open my exam →</a><a class="ghost-button" href="#/tests">Browse tests</a><a class="ghost-button" href="#/results">View results</a></div>
       </section>`;
   }
 
