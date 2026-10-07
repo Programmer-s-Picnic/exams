@@ -169,7 +169,8 @@
       register: renderRegister,
       home: renderDashboard,
       constable: renderConstable,
-      paper: () => renderPaper(id),
+      document: () => renderQuestionDocument(id),
+      paper: () => { location.hash = '#/document/' + encodeURIComponent(id); },
       admin: () => AdminConsole.render(state, sessionStorage.getItem('he_admin_token') || ''),
       inventory: () => { location.hash = '#/admin'; },
       onboarding: renderOnboarding,
@@ -567,69 +568,125 @@
     } catch (error) { mount.innerHTML = `<section class="page"><div class="error-state"><h1>Content inventory unavailable</h1><p>Please try again later.</p></div></section>`; }
   }
 
-  function approvedPaper(id) {
-    return state.papers.find(item => item.id === id && item.adminValidation?.status === 'approved' && Array.isArray(item.questions) && item.questions.length);
+  function approvedQuestionDocument(id) {
+    const candidates = [
+      ...state.papers.map(record => ({ ...record, _recordType: 'document' })),
+      ...state.syllabus.filter(record => Array.isArray(record.questions) && record.questions.length).map(record => ({
+        ...record,
+        id: record.id || `syllabus-${record.examId}`,
+        title: record.title || record.paper || `${examName(record.examId)} syllabus questions`,
+        documentType: record.documentType || 'syllabus-question-set',
+        _recordType: 'syllabus'
+      }))
+    ];
+    return candidates.find(item =>
+      item.id === id &&
+      item.adminValidation?.status === 'approved' &&
+      Array.isArray(item.questions) &&
+      item.questions.length
+    );
   }
 
-  function paperTestFromPaper(paper) {
-    if (!paper || !Array.isArray(paper.questions) || !paper.questions.length) return null;
-    const perQuestionSeconds = 48;
-    const durationMinutes = Number(paper.durationMinutes) || Math.max(1, Math.round(paper.questions.length * perQuestionSeconds / 60));
-    const correct = Number(paper.marksPerQuestion ?? 2);
-    const incorrect = -Math.abs(Number(paper.negativeMarking ?? 0));
+  function questionSetTestFromDocument(record) {
+    if (!record || record.testEnabled === false || !Array.isArray(record.questions) || !record.questions.length) return null;
+    const config = record.testConfig || {};
+    const perQuestionSeconds = Number(config.questionSeconds || 48);
+    const durationMinutes = Number(config.durationMinutes) || Math.max(1, Math.round(record.questions.length * perQuestionSeconds / 60));
+    const correct = Number(config.correctMarks ?? record.marksPerQuestion ?? 2);
+    const incorrect = Number(config.wrongMarks ?? -Math.abs(Number(record.negativeMarking ?? 0)));
+    const unanswered = Number(config.unansweredMarks ?? 0);
+    const type = record.documentType || 'question-set';
     return {
-      id: `pyq-${paper.id}`,
-      baseTestId: `pyq-${paper.id}`,
-      type: 'previous_year',
-      examId: paper.examId,
-      examIds: [paper.examId],
-      paperId: paper.id,
-      title: paper.title,
-      description: `Previous-year paper · ${paper.examDate || paper.year} · Shift ${paper.shift || ''}`,
-      category: 'Previous Year Paper',
-      difficulty: 'Previous year',
+      id: `docq-${record.id}`,
+      baseTestId: `docq-${record.id}`,
+      type: type.includes('previous') || type.includes('exam-paper') ? 'previous_year' : 'question_set',
+      examId: record.examId,
+      examIds: [record.examId],
+      documentId: record.id,
+      paperId: record.id,
+      title: record.title || record.paper || 'Question set',
+      description: record.description || [record.examDate || record.year, record.shift ? `Shift ${record.shift}` : null].filter(Boolean).join(' · '),
+      category: record.category || (type.includes('previous') || type.includes('exam-paper') ? 'Previous Year Paper' : 'Question Set'),
+      difficulty: record.difficulty || 'Exam practice',
       icon: 'test',
       available: true,
-      questions: paper.questions.map(question => ({ ...question, explanation: question.explanation || 'Review the correct answer.' })),
-      totalMarks: paper.questions.reduce((sum, question) => sum + Number(question.marks ?? correct), 0),
+      questions: record.questions.map(question => ({ ...question, explanation: question.explanation || 'Review the correct answer.' })),
+      totalMarks: record.questions.reduce((sum, question) => sum + Number(question.marks ?? correct), 0),
       negativeMarking: Math.abs(incorrect),
-      marking: { correct, incorrect, unanswered: 0 },
+      marking: { correct, incorrect, unanswered },
       timing: { totalSeconds: durationMinutes * 60, questionSeconds: perQuestionSeconds },
-      defaultMode: 'total-timed',
-      feedbackMode: 'on-completion',
-      passingPercent: 0
+      defaultMode: config.defaultMode || 'total-timed',
+      feedbackMode: config.feedbackMode || 'on-completion',
+      passingPercent: Number(record.passingPercent || 0)
     };
   }
 
   function findTest(id) {
     const stored = state.tests.find(item => item.id === id);
     if (stored) return stored;
-    if (id?.startsWith('pyq-')) return paperTestFromPaper(approvedPaper(id.slice(4)));
+    if (id?.startsWith('docq-')) return questionSetTestFromDocument(approvedQuestionDocument(id.slice(5)));
+    if (id?.startsWith('pyq-')) return questionSetTestFromDocument(approvedQuestionDocument(id.slice(4)));
     return null;
   }
 
-  function renderPaper(id) {
-    if (!state.user || state.preferences.primary !== 'up-police') { location.hash = '#/constable'; return; }
-    const paper = approvedPaper(id);
-    if (!paper) return notFound('Question paper is not available');
-    const test = paperTestFromPaper(paper);
-    const date = paper.examDate ? new Date(`${paper.examDate}T00:00:00`).toLocaleDateString('en-IN', { day:'numeric', month:'long', year:'numeric' }) : paper.year;
-    const subjectLabel = subjectId => ({
-      'numerical':'Numerical and Mental Ability',
-      'general-knowledge':'General Knowledge',
-      'hindi':'General Hindi',
-      'reasoning':'Mental Aptitude, I.Q. and Reasoning'
-    }[subjectId] || subjectId || 'Question');
+  function documentBackRoute(record) {
+    return record?.examId === 'up-police' ? '#/constable' : '#/home';
+  }
+
+  function documentTypeLabel(record) {
+    const value = String(record.documentType || '').toLowerCase();
+    if (value.includes('previous')) return 'PREVIOUS YEAR PAPER';
+    if (value.includes('exam-paper')) return 'EXAM PAPER';
+    if (value.includes('syllabus')) return 'SYLLABUS QUESTION SET';
+    return 'QUESTION SET';
+  }
+
+  function documentSubjectLabel(record, subjectId) {
+    const syllabus = state.syllabus.find(item => item.examId === record.examId);
+    const section = syllabus?.sections?.find(item => item.id === subjectId);
+    return section?.name || subjectId || 'Question';
+  }
+
+  function renderQuestionDocument(id) {
+    const record = approvedQuestionDocument(id);
+    if (!record) return notFound('Question set is not available');
+    if (!state.user) {
+      sessionStorage.setItem('he_after_login', `#/document/${encodeURIComponent(id)}`);
+      location.hash = '#/login';
+      return;
+    }
+    if (!state.preferences.selected.includes(record.examId)) {
+      sessionStorage.setItem('he_after_login', `#/document/${encodeURIComponent(id)}`);
+      sessionStorage.setItem('he_preselected_exam', record.examId);
+      location.hash = '#/onboarding';
+      return;
+    }
+    const test = questionSetTestFromDocument(record);
+    const metadata = [
+      record.examDate ? new Date(`${record.examDate}T00:00:00`).toLocaleDateString('en-IN', { day:'numeric', month:'long', year:'numeric' }) : record.year,
+      record.shift ? `Shift ${record.shift}` : null,
+      `${record.questions.length} questions`
+    ].filter(Boolean).join(' · ');
+    const publicLink = record.publicSourceUrl || record.source || '';
     document.getElementById('app').innerHTML = `
       <section class="page paper-page">
-        <a class="back-link" href="#/constable">← Previous papers</a>
-        <div class="page-hero compact"><span class="eyebrow">PREVIOUS YEAR PAPER</span><h1>${escapeHtml(paper.title)}</h1><p>${escapeHtml(date)} · Shift ${escapeHtml(paper.shift)} · ${paper.questions.length} questions available</p></div>
-        <div class="paper-actions"><a class="primary-button" href="#/instructions/${encodeURIComponent(test.id)}">Attempt as test →</a><a class="ghost-button" href="#paperQuestions">View questions</a>${paper.publicSourceUrl ? `<a class="ghost-button" href="${escapeHtml(paper.publicSourceUrl)}" target="_blank" rel="noopener noreferrer">Open document ↗</a>` : ''}</div>
-        <div class="paper-summary"><article><strong>${paper.questions.length}</strong><span>Questions</span></article><article><strong>${test.totalMarks}</strong><span>Marks</span></article><article><strong>${Math.round(test.timing.totalSeconds/60)} min</strong><span>Test time</span></article><article><strong>${test.marking.incorrect}</strong><span>Wrong answer</span></article></div>
-        <section id="paperQuestions" class="paper-question-list"><div class="section-heading"><div><span class="eyebrow">QUESTION PAPER</span><h2>Questions</h2></div></div>
-          ${paper.questions.map((question,index)=>`<article class="paper-question"><div class="paper-question-number">${index+1}</div><div><span class="tag-row"><i>${escapeHtml(subjectLabel(question.subjectId))}</i><i>${escapeHtml(question.topic || '')}</i></span><h3>${escapeHtml(question.question)}</h3><ol type="A">${question.options.map(option=>`<li>${escapeHtml(option)}</li>`).join('')}</ol></div></article>`).join('')}
+        <a class="back-link" href="${documentBackRoute(record)}">← Back to exam</a>
+        <div class="page-hero compact"><span class="eyebrow">${documentTypeLabel(record)}</span><h1>${escapeHtml(record.title || record.paper || 'Question set')}</h1><p>${escapeHtml(metadata)}</p></div>
+        <div class="paper-actions">
+          ${test ? `<a class="primary-button" href="#/instructions/${encodeURIComponent(test.id)}">Attempt as test →</a>` : ''}
+          <a class="ghost-button" href="#documentQuestions">View questions</a>
+          ${publicLink ? `<a class="ghost-button" href="${escapeHtml(publicLink)}" target="_blank" rel="noopener noreferrer">Open document ↗</a>` : ''}
+        </div>
+        <div class="paper-summary">
+          <article><strong>${record.questions.length}</strong><span>Questions</span></article>
+          <article><strong>${test ? test.totalMarks : '—'}</strong><span>Marks</span></article>
+          <article><strong>${test ? Math.round(test.timing.totalSeconds/60)+' min' : '—'}</strong><span>Test time</span></article>
+          <article><strong>${test ? test.marking.incorrect : '—'}</strong><span>Wrong answer</span></article>
+        </div>
+        <section id="documentQuestions" class="paper-question-list"><div class="section-heading"><div><span class="eyebrow">QUESTIONS</span><h2>Question set</h2></div></div>
+          ${record.questions.map((question,index)=>`<article class="paper-question"><div class="paper-question-number">${index+1}</div><div><span class="tag-row"><i>${escapeHtml(documentSubjectLabel(record, question.subjectId))}</i><i>${escapeHtml(question.topic || '')}</i></span><h3>${escapeHtml(question.question)}</h3><ol type="A">${question.options.map(option=>`<li>${escapeHtml(option)}</li>`).join('')}</ol></div></article>`).join('')}
         </section>
-        <div class="paper-bottom-action"><a class="primary-button" href="#/instructions/${encodeURIComponent(test.id)}">Attempt this paper as a test →</a></div>
+        ${test ? `<div class="paper-bottom-action"><a class="primary-button" href="#/instructions/${encodeURIComponent(test.id)}">Attempt this question set →</a></div>` : ''}
       </section>`;
   }
 
@@ -664,7 +721,7 @@
       const badge = paper.series === 'latest-exam' ? 'LATEST EXAM PAPER' : 'PREVIOUS YEAR PAPER';
       const count = Array.isArray(paper.questions) ? paper.questions.length : 0;
       const sourceLink = paper.publicSourceUrl ? `<a class="ghost-button" href="${escapeHtml(paper.publicSourceUrl)}" target="_blank" rel="noopener noreferrer">Open document ↗</a>` : '';
-      const questionActions = count ? `<a class="ghost-button" href="#/paper/${encodeURIComponent(paper.id)}">View questions</a><a class="primary-button" href="#/instructions/${encodeURIComponent('pyq-'+paper.id)}">Attempt as test →</a>` : '';
+      const questionActions = count ? `<a class="ghost-button" href="#/document/${encodeURIComponent(paper.id)}">View questions</a>${paper.testEnabled !== false ? `<a class="primary-button" href="#/instructions/${encodeURIComponent('docq-'+paper.id)}">Attempt as test →</a>` : ''}` : '';
       return `<article class="hub-tile">
         <small>${badge}</small>
         <h3>${escapeHtml(date)} · Shift ${escapeHtml(paper.shift)}</h3>
@@ -935,7 +992,7 @@
           const percent = Math.round(scores.correct / scores.total * 100);
           return `<div class="topic-row"><span><strong>${topic}</strong><small>${scores.correct}/${scores.total} correct</small></span><div><i style="width:${percent}%"></i></div><b>${percent}%</b></div>`;
         }).join('')}</article>
-        <div class="result-actions"><a class="ghost-button" href="${test.type === 'previous_year' ? '#/paper/'+encodeURIComponent(test.paperId) : '#/tests'}">${test.type === 'previous_year' ? 'Back to paper' : 'More tests'}</a><a class="primary-button" href="#/review/${result.id}">Review answers →</a></div>
+        <div class="result-actions"><a class="ghost-button" href="${test.documentId || test.paperId ? '#/document/'+encodeURIComponent(test.documentId || test.paperId) : '#/tests'}">${test.documentId || test.paperId ? 'Back to question set' : 'More tests'}</a><a class="primary-button" href="#/review/${result.id}">Review answers →</a></div>
         <section class="analysis-card"><h2>Retake questions</h2><p>Questions and options are reshuffled for each retake.</p><div class="result-actions retake-actions">${[['unanswered','Unanswered only'],['review','Unanswered + wrong'],['wrong','Wrong only'],['all','All questions']].map(([mode,label]) => `<button class="ghost-button" data-retake="${mode}" ${mode !== 'all' && !retakeQuestions(test, result, mode).length ? 'disabled' : ''}>${label} (${retakeQuestions(test, result, mode).length})</button>`).join('')}</div></section>
       </section>`;
     document.querySelectorAll('[data-retake]').forEach(button => button.addEventListener('click', () => startRetake(test, result, button.dataset.retake)));
