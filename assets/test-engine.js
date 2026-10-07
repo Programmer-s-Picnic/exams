@@ -2,6 +2,7 @@
   let STORAGE_KEY = 'he_active_attempt_v2_guest';
   let RESULT_KEY = 'he_results_v2_guest';
   let timerId = null;
+  let resultHandler = null;
 
   const state = {
     test: null,
@@ -307,8 +308,9 @@
     };
     const results = getResults();
     results.unshift(result);
-    localStorage.setItem(RESULT_KEY, JSON.stringify(results.slice(0, 50)));
+    localStorage.setItem(RESULT_KEY, JSON.stringify(results.slice(0, 500)));
     localStorage.removeItem(STORAGE_KEY);
+    if (resultHandler) Promise.resolve(resultHandler(result)).catch(() => {});
     window.App.closeModal();
     tone(result.passed ? 920 : 420, 0.3);
     location.hash = `#/result/${result.id}`;
@@ -317,6 +319,18 @@
   function getResults() {
     try { return JSON.parse(localStorage.getItem(RESULT_KEY)) || []; } catch (_) { return []; }
   }
+  function mergeResults(incoming = []) {
+    const map = new Map();
+    [...getResults(), ...(Array.isArray(incoming) ? incoming : [])].forEach(result => {
+      if (!result || !result.id) return;
+      const current = map.get(String(result.id));
+      if (!current || String(result.date || '') >= String(current.date || '')) map.set(String(result.id), result);
+    });
+    const merged = [...map.values()].sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).slice(0, 500);
+    localStorage.setItem(RESULT_KEY, JSON.stringify(merged));
+    return merged;
+  }
+  function setResultHandler(handler) { resultHandler = typeof handler === 'function' ? handler : null; }
 
   function escapeHtml(value) {
     return String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]));
@@ -336,5 +350,5 @@
     }
   }
 
-  window.TestEngine = { start, stop, activeAttempt, getResults, formatTime, setSound, setUser, get storageKey() { return STORAGE_KEY; } };
+  window.TestEngine = { start, stop, activeAttempt, getResults, mergeResults, setResultHandler, formatTime, setSound, setUser, get storageKey() { return STORAGE_KEY; } };
 }());

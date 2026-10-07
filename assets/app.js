@@ -37,6 +37,25 @@
     useAccount(result.user);
     updateUserShell();
   }
+  async function syncResultsWithServer() {
+    if (!state.user || !authToken()) return TestEngine.getResults();
+    try {
+      const local = TestEngine.getResults();
+      if (local.length) await Api.auth('results', { results: local.slice(0, 100) }, authToken());
+      const remote = await Api.auth('results', undefined, authToken());
+      return TestEngine.mergeResults(remote.results || []);
+    } catch (error) {
+      console.warn('Result sync unavailable:', error.message);
+      return TestEngine.getResults();
+    }
+  }
+  async function saveResultToServer(result) {
+    if (!state.user || !authToken() || !result?.id) return;
+    try { await Api.auth('results', { result }, authToken()); }
+    catch (error) { console.warn('Result will sync later:', error.message); }
+  }
+  TestEngine.setResultHandler(saveResultToServer);
+
   function icon(name) {
     const icons = {
       police: '<path d="M12 3 5 6v5c0 4.5 2.8 8.2 7 10 4.2-1.8 7-5.5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/>',
@@ -68,7 +87,10 @@
       ]);
       state.config = config;
       if (authToken()) {
-        try { useAccount((await Api.auth('me', undefined, authToken())).user); }
+        try {
+          useAccount((await Api.auth('me', undefined, authToken())).user);
+          await syncResultsWithServer();
+        }
         catch (_) { sessionStorage.removeItem('he_auth_token'); localStorage.removeItem('he_auth_token'); }
       }
       state.exams = exams.exams || [];
@@ -185,6 +207,13 @@
       help: renderHelp
     };
     (routes[name] || (state.user ? renderDashboard : renderLanding))();
+    const syncButton = document.getElementById('syncResultsNow');
+    if (syncButton) syncButton.onclick = async () => {
+      syncButton.disabled = true;
+      syncButton.textContent = 'Syncing…';
+      await syncResultsWithServer();
+      renderResults();
+    };
     window.scrollTo(0, 0);
   }
 
@@ -268,13 +297,14 @@
       google.accounts.id.renderButton(container, { theme: 'outline', size: 'large', text: 'continue_with', shape: 'pill', width: Math.min(container.clientWidth || 360, 360) });
     } catch (_) { /* The Google button is optional until configured. */ }
   }
-  function completeSignIn() {
+  async function completeSignIn() {
     document.body.classList.remove('auth-mode');
     const preselected = sessionStorage.getItem('he_preselected_exam');
     if (preselected && state.exams.some(exam => exam.id === preselected && exam.available)) {
       state.preferences = { selected: [preselected], primary: preselected };
       sessionStorage.removeItem('he_preselected_exam');
     }
+    await syncResultsWithServer();
     const requested = sessionStorage.getItem('he_after_login');
     sessionStorage.removeItem('he_after_login');
     location.hash = requested || (state.preferences.primary ? '#/home' : '#/onboarding');
@@ -282,7 +312,7 @@
   async function signInWithGoogle(credential, errorId) {
     try {
       saveAuth(await Api.auth('google-login', { credential }), true);
-      completeSignIn();
+      await completeSignIn();
     } catch (error) {
       const node = document.getElementById(errorId);
       if (node) node.textContent = error.message;
@@ -324,7 +354,7 @@
       try {
         saveAuth(await Api.auth('login', { login, password }), document.getElementById('rememberLogin').checked);
       } catch (error) { document.getElementById('loginError').textContent = error.message; return; }
-      completeSignIn();
+      await completeSignIn();
     });
     renderGoogleButton('googleLogin', response => signInWithGoogle(response.credential, 'loginError'));
   }
