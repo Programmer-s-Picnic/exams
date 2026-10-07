@@ -38,7 +38,7 @@ class Api{
     String? token,
     bool auth=false,
   })async{
-    final key='\${auth?'auth':'data'}:$path';
+    final key='${auth?'auth':'data'}:$path';
     if(method=='GET'&&!refresh&&cache[key]!=null)return cache[key]!;
     final urls=auth?['$authRoot/$path.php']:['$root/$path','$legacyRoot/$path'];
     Object? last;
@@ -58,7 +58,7 @@ class Api{
         final raw=await utf8.decoder.bind(response).join();
         final decoded=raw.isEmpty?<String,dynamic>{}:Map<String,dynamic>.from(jsonDecode(raw));
         if(response.statusCode<200||response.statusCode>=300){
-          throw ApiException('\${decoded['error']??'The service is temporarily unavailable. Please try again.'}');
+          throw ApiException('${decoded['error']??'The service is temporarily unavailable. Please try again.'}');
         }
         if(method=='GET'&&!auth)cache[key]=decoded;
         return decoded;
@@ -84,16 +84,16 @@ Future<Map<String,dynamic>> googleAccount()async{
   if(auth.idToken==null)throw const ApiException('Google did not return a valid identity token.');
   final result=await Api.auth('google-login',body:{'credential':auth.idToken});
   final user=Map<String,dynamic>.from(result['user']);
-  Store.scope='\${user['id']}';
+  Store.scope='${user['id']}';
   await Store.set('user',user);
-  await Store.set('token','\${result['token']}');
+  await Store.set('token','${result['token']}');
   return user;
 }
 String googleError(Object e)=>e is PlatformException?'Google sign-in is unavailable right now. Please try again.':'$e';
 
 class Store{
   static String scope='guest';
-  static String key(String k)=>['prefs','results','active','sound'].contains(k)?'\${k}_$scope':k;
+  static String key(String k)=>['prefs','results','active','sound'].contains(k)?'${k}_$scope':k;
   static Future<SharedPreferences> get p=>SharedPreferences.getInstance();
   static Future<Map<String,dynamic>?> map(String k)async{
     final s=(await p).getString(key(k));
@@ -105,7 +105,7 @@ class Store{
   }
   static Future<String?> string(String k)async{
     final s=(await p).getString(key(k));
-    return s==null?null:'\${jsonDecode(s)}';
+    return s==null?null:'${jsonDecode(s)}';
   }
   static Future<bool> boolValue(String k,{bool fallback=true})async{
     final s=(await p).getString(key(k));
@@ -221,7 +221,7 @@ class _SessionStart extends State<SessionStart>{
       if(s.connectionState!=ConnectionState.done)return const LoadingPage();
       final user=s.data;
       if(user==null)return Landing(d:widget.d);
-      Store.scope='\${user['id']}';
+      Store.scope='${user['id']}';
       return FutureBuilder<Map<String,dynamic>?>(
         future:Store.map('prefs'),
         builder:(c,p){
@@ -229,7 +229,7 @@ class _SessionStart extends State<SessionStart>{
           final prefs=p.data;
           if(prefs?['primary']!=null){
             final selected=Set<String>.from(prefs?['selected']??[prefs?['primary']]);
-            return Shell(d:widget.d,u:user,selected:selected,primary:'\${prefs?['primary']}');
+            return Shell(d:widget.d,u:user,selected:selected,primary:'${prefs?['primary']}');
           }
           return Goals(d:widget.d,u:user);
         },
@@ -256,12 +256,12 @@ class Landing extends StatelessWidget{
         Padding(
           padding:const EdgeInsets.fromLTRB(22,38,22,36),
           child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-            Pill('\${content['badge']??'UTTAR PRADESH EXAM PREPARATION'}',dark:true),
+            Pill('${content['badge']??'UTTAR PRADESH EXAM PREPARATION'}',dark:true),
             const SizedBox(height:18),
-            Text('\${content['titleBefore']??'Prepare Smarter for'}\n\${content['titleHighlight']??'Government Exams'}',
+            Text('${content['titleBefore']??'Prepare Smarter for'}\n${content['titleHighlight']??'Government Exams'}',
               style:const TextStyle(color:Colors.white,fontSize:39,height:1.08,fontWeight:FontWeight.w900)),
             const SizedBox(height:16),
-            Text('\${content['description']??'Focused practice, mock tests and performance analysis.'}',
+            Text('${content['description']??'Focused practice, mock tests and performance analysis.'}',
               style:const TextStyle(color:Color(0xffd1e2df),fontSize:17,height:1.5)),
             const SizedBox(height:23),
             FilledButton(
@@ -277,7 +277,7 @@ class Landing extends StatelessWidget{
             ),
             const SizedBox(height:22),
             Row(mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[
-              Metric('\${d.exams.length}','Exam paths'),
+              Metric('${d.exams.length}','Exam paths'),
               Metric('$count+','Questions'),
               const Metric('3','Timing modes'),
             ]),
@@ -289,16 +289,16 @@ class Landing extends StatelessWidget{
           child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
             const Text('Preparation paths',style:TextStyle(fontSize:27,fontWeight:FontWeight.w900,color:ink)),
             const SizedBox(height:15),
-            ...d.exams.map((e)=>ExamCard(e:e,tap:e['available']==true?()=>login(c,exam:'\${e['id']}'):null)),
+            ...d.exams.map((e)=>ExamCard(e:e,tap:e['available']==true?()=>login(c,exam:'${e['id']}'):null)),
             if(available.isNotEmpty)...[
               const SizedBox(height:12),
               Box(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
                 const Pill('AVAILABLE NOW'),
                 const SizedBox(height:10),
-                Text('\${available.first['title']}',style:const TextStyle(fontSize:20,fontWeight:FontWeight.w900)),
-                Text('\${available.first['description']}'),
+                Text('${available.first['title']}',style:const TextStyle(fontSize:20,fontWeight:FontWeight.w900)),
+                Text('${available.first['description']}'),
                 const SizedBox(height:12),
-                FilledButton(onPressed:()=>login(c,exam:'up-police',test:'\${available.first['id']}'),child:const Text('View test →')),
+                FilledButton(onPressed:()=>login(c,exam:'up-police',test:'${available.first['id']}'),child:const Text('View test →')),
               ])),
             ],
           ]),
@@ -320,10 +320,10 @@ class Landing extends StatelessWidget{
           return ListTile(
             enabled:ok,
             leading:Icon(ok?Icons.local_police_outlined:Icons.schedule,color:ok?blue:Colors.grey),
-            title:Text('\${e['name']}',style:const TextStyle(fontWeight:FontWeight.w800)),
-            subtitle:Text(ok?'\${e['authority']}':'Coming soon'),
+            title:Text('${e['name']}',style:const TextStyle(fontWeight:FontWeight.w800)),
+            subtitle:Text(ok?'${e['authority']}':'Coming soon'),
             trailing:ok?const Icon(Icons.arrow_forward):null,
-            onTap:ok?(){Navigator.pop(c);login(c,exam:'\${e['id']}');}:null,
+            onTap:ok?(){Navigator.pop(c);login(c,exam:'${e['id']}');}:null,
           );
         }),
       ]),
@@ -344,7 +344,7 @@ class _Login extends State<Login>{
     if(!mounted)return;
     final remembered=widget.exam==null&&widget.test==null&&prefs?['primary']!=null;
     if(remembered){
-      final primary='\${prefs?['primary']}';
+      final primary='${prefs?['primary']}';
       final selected=Set<String>.from(prefs?['selected']??[primary]);
       Navigator.pushAndRemoveUntil(context,MaterialPageRoute(builder:(_)=>Shell(d:widget.d,u:u,selected:selected,primary:primary)),(_)=>false);
     }else{
@@ -356,8 +356,8 @@ class _Login extends State<Login>{
     try{
       final result=await Api.auth('login',body:{'login':id.text.trim().toLowerCase(),'password':pw.text});
       final u=Map<String,dynamic>.from(result['user']);
-      Store.scope='\${u['id']}';
-      await Store.set('user',u);await Store.set('token','\${result['token']}');
+      Store.scope='${u['id']}';
+      await Store.set('user',u);await Store.set('token','${result['token']}');
       await finish(u);
     }catch(e){if(mounted)setState(()=>{busy=false,err='$e'});}
   }
@@ -422,7 +422,7 @@ class _Register extends State<Register>{
         'password':password.text,'password_confirmation':confirm.text
       });
       final u=Map<String,dynamic>.from(result['user']);
-      Store.scope='\${u['id']}';await Store.set('user',u);await Store.set('token','\${result['token']}');
+      Store.scope='${u['id']}';await Store.set('user',u);await Store.set('token','${result['token']}');
       await finish(u);
     }catch(e){if(mounted)setState(()=>{busy=false,err='$e'});}
   }
@@ -509,13 +509,13 @@ class _Goals extends State<Goals>{
         const Text('आप किस परीक्षा की तैयारी कर रहे हैं?',style:TextStyle(fontSize:18,color:blue)),
         const SizedBox(height:16),
         ...widget.d.exams.map((e){
-          final id='\${e['id']}';final on=selected.contains(id);final available=e['available']==true;
+          final id='${e['id']}';final on=selected.contains(id);final available=e['available']==true;
           return ExamCard(e:e,on:on,tap:available?()=>setState((){selected={id};primary=id;}):null);
         }),
         if(selected.isNotEmpty)DropdownButtonFormField<String>(
           value:selected.contains(primary)?primary:null,
           decoration:const InputDecoration(labelText:'Primary exam focus'),
-          items:selected.map((id)=>DropdownMenuItem(value:id,child:Text('\${widget.d.exams.firstWhere((e)=>e['id']==id)['name']}'))).toList(),
+          items:selected.map((id)=>DropdownMenuItem(value:id,child:Text('${widget.d.exams.firstWhere((e)=>e['id']==id)['name']}'))).toList(),
           onChanged:(v)=>setState(()=>primary=v),
         ),
         const SizedBox(height:17),
@@ -576,7 +576,7 @@ class _Shell extends State<Shell>{
         title:const Row(children:[Logo(38),SizedBox(width:9),Text('UP NaukriGuru',style:TextStyle(fontSize:18,fontWeight:FontWeight.w900))]),
         actions:[
           IconButton(onPressed:load,tooltip:'Refresh',icon:const Icon(Icons.refresh)),
-          Padding(padding:const EdgeInsets.only(right:12),child:CircleAvatar(backgroundColor:mint,foregroundColor:forest,child:Text('\${widget.u['name']}'[0].toUpperCase()))),
+          Padding(padding:const EdgeInsets.only(right:12),child:CircleAvatar(backgroundColor:mint,foregroundColor:forest,child:Text('${widget.u['name']}'[0].toUpperCase()))),
         ],
       ),
       body:IndexedStack(index:tab,children:pages),
@@ -613,7 +613,7 @@ class HomePage extends StatelessWidget{
     final next=tests.where((t)=>!completed.contains(t['id'])).toList();
     final suggested=next.isNotEmpty?next.first:(tests.isNotEmpty?tests.first:null);
     return ListView(padding:const EdgeInsets.all(18),children:[
-      Text('Good \${dayPart()}, \${'\${u['name']}'.split(' ').first}',style:const TextStyle(fontSize:28,fontWeight:FontWeight.w900)),
+      Text('Good ${dayPart()}, ${'${u['name']}'.split(' ').first}',style:const TextStyle(fontSize:28,fontWeight:FontWeight.w900)),
       const Text('Track your tests, results and current preparation priorities.',style:TextStyle(color:muted)),
       const SizedBox(height:16),
       Box(
@@ -622,10 +622,10 @@ class HomePage extends StatelessWidget{
         child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
           const Text('PRIMARY GOAL',style:TextStyle(color:mint,fontSize:11,fontWeight:FontWeight.w900)),
           const SizedBox(height:8),
-          Text('\${exam['name']}',style:const TextStyle(color:Colors.white,fontSize:25,fontWeight:FontWeight.w900)),
-          Text('\${exam['description']}',style:const TextStyle(color:Colors.white70)),
+          Text('${exam['name']}',style:const TextStyle(color:Colors.white,fontSize:25,fontWeight:FontWeight.w900)),
+          Text('${exam['description']}',style:const TextStyle(color:Colors.white70)),
           const SizedBox(height:12),
-          Text('\${exam['authority']}',style:const TextStyle(color:mint,fontWeight:FontWeight.w700)),
+          Text('${exam['authority']}',style:const TextStyle(color:mint,fontWeight:FontWeight.w700)),
           const SizedBox(height:12),
           Row(children:[Text('$avg% average',style:const TextStyle(color:Colors.white,fontWeight:FontWeight.w800)),const Spacer(),const Icon(Icons.arrow_forward,color:Colors.white)]),
         ]),
@@ -648,18 +648,18 @@ class HomePage extends StatelessWidget{
           const Icon(Icons.restore,color:Colors.orange),const SizedBox(width:10),
           Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
             const Text('Saved attempt',style:TextStyle(fontWeight:FontWeight.w900)),
-            Text('\${active!['title']??'Your test'}'),
-            Text('Question \${NumberTools.intValue(active!['current'])+1}',style:const TextStyle(color:muted)),
+            Text('${active!['title']??'Your test'}'),
+            Text('Question ${NumberTools.intValue(active!['current'])+1}',style:const TextStyle(color:muted)),
           ])),
           FilledButton(onPressed:(){
             final saved=Map<String,dynamic>.from(active!);
             final t=Map<String,dynamic>.from(saved['test']??{});
-            Navigator.push(c,MaterialPageRoute(builder:(_)=>TestPage(t:t,mode:'\${saved['mode']}',feedback:'\${saved['feedback']}',saved:saved,done:reload,sound:sound)));
+            Navigator.push(c,MaterialPageRoute(builder:(_)=>TestPage(t:t,mode:'${saved['mode']}',feedback:'${saved['feedback']}',saved:saved,done:reload,sound:sound)));
           },child:const Text('Resume')),
         ]),
       ),
       Row(children:[
-        Expanded(child:Stat('\${results.length}','Attempts')),const SizedBox(width:8),
+        Expanded(child:Stat('${results.length}','Attempts')),const SizedBox(width:8),
         Expanded(child:Stat('$avg%','Average')),const SizedBox(width:8),
         Expanded(child:Stat('$passed','Passed')),
       ]),
@@ -690,19 +690,19 @@ class ExamHub extends StatelessWidget{
   @override Widget build(BuildContext c){
     final approved=syllabus['adminValidation']?['status']=='approved';
     final approvedPapers=papers.where((p)=>p['examId']==exam['id']&&p['adminValidation']?['status']=='approved').toList()
-      ..sort((a,b)=>'\${b['examDate']}'.compareTo('\${a['examDate']}'));
+      ..sort((a,b)=>'${b['examDate']}'.compareTo('${a['examDate']}'));
     final practice=tests.where((t)=>t['type']!='diagnostic'&&List<dynamic>.from(t['examIds']??[]).contains(exam['id'])).toList();
     final latest=results.isEmpty?null:results.first;
     return ListView(padding:const EdgeInsets.all(18),children:[
       const Pill('UP POLICE CONSTABLE'),
       const SizedBox(height:8),
-      Text('\${exam['name']}',style:const TextStyle(fontSize:29,fontWeight:FontWeight.w900)),
-      Text('\${exam['description']}',style:const TextStyle(color:muted)),
+      Text('${exam['name']}',style:const TextStyle(fontSize:29,fontWeight:FontWeight.w900)),
+      Text('${exam['description']}',style:const TextStyle(color:muted)),
       const TitleText('Overview'),
       ...List<Map<String,dynamic>>.from(exam['sources']??[]).map((source)=>Box(child:Row(children:[
         const Icon(Icons.description_outlined,color:blue),const SizedBox(width:10),
-        Expanded(child:Text('\${source['label']}',style:const TextStyle(fontWeight:FontWeight.w800))),
-        IconButton(onPressed:()=>open('\${source['url']}'),icon:const Icon(Icons.open_in_new)),
+        Expanded(child:Text('${source['label']}',style:const TextStyle(fontWeight:FontWeight.w800))),
+        IconButton(onPressed:()=>open('${source['url']}'),icon:const Icon(Icons.open_in_new)),
       ]))),
       const TitleText('How to use'),
       const Box(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
@@ -715,21 +715,21 @@ class ExamHub extends StatelessWidget{
       const TitleText('Syllabus'),
       if(approved)...[
         Wrap(spacing:8,runSpacing:8,children:[
-          Chip(label:Text('\${syllabus['totalQuestions']??150} questions')),
-          Chip(label:Text('\${syllabus['totalMarks']??300} marks')),
-          Chip(label:Text('\${syllabus['durationMinutes']??120} minutes')),
+          Chip(label:Text('${syllabus['totalQuestions']??150} questions')),
+          Chip(label:Text('${syllabus['totalMarks']??300} marks')),
+          Chip(label:Text('${syllabus['durationMinutes']??120} minutes')),
           Chip(label:Text(syllabus['negativeMarking']==true?'Negative marking':'No negative marking')),
         ]),
         const SizedBox(height:10),
         ...List<Map<String,dynamic>>.from(syllabus['sections']??[]).map((section)=>Box(child:Column(
           crossAxisAlignment:CrossAxisAlignment.start,
           children:[
-            Text('\${section['name']}',style:const TextStyle(fontSize:17,fontWeight:FontWeight.w900)),
+            Text('${section['name']}',style:const TextStyle(fontSize:17,fontWeight:FontWeight.w900)),
             const SizedBox(height:6),
             ...List<String>.from(section['topics']??[]).map((topic)=>Padding(padding:const EdgeInsets.symmetric(vertical:2),child:Text('• $topic'))),
           ],
         ))),
-        if('\${syllabus['source']??''}'.isNotEmpty)OutlinedButton.icon(onPressed:()=>open('\${syllabus['source']}'),icon:const Icon(Icons.open_in_new),label:const Text('Open official syllabus')),
+        if('${syllabus['source']??''}'.isNotEmpty)OutlinedButton.icon(onPressed:()=>open('${syllabus['source']}'),icon:const Icon(Icons.open_in_new),label:const Text('Open official syllabus')),
       ]else
         const Box(child:Text('Syllabus details will be available shortly.')),
       const TitleText('Previous papers'),
@@ -737,12 +737,12 @@ class ExamHub extends StatelessWidget{
         const Box(child:Text('Previous papers will be available shortly.'))
       else
         ...approvedPapers.map((paper)=>Box(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-          Text('\${paper['title']}',style:const TextStyle(fontWeight:FontWeight.w900)),
-          Text('\${paper['language']??'Hindi / English'} · \${paper['questionsExpected']??150} questions',style:const TextStyle(color:muted)),
+          Text('${paper['title']}',style:const TextStyle(fontWeight:FontWeight.w900)),
+          Text('${paper['language']??'Hindi / English'} · ${paper['questionsExpected']??150} questions',style:const TextStyle(color:muted)),
           const SizedBox(height:8),
           Wrap(spacing:8,children:[
-            if('\${paper['publicSourceUrl']??''}'.isNotEmpty)OutlinedButton(onPressed:()=>open('\${paper['publicSourceUrl']}'),child:const Text('Open paper')),
-            if('\${paper['officialVerificationUrl']??''}'.isNotEmpty)OutlinedButton(onPressed:()=>open('\${paper['officialVerificationUrl']}'),child:const Text('Official notice')),
+            if('${paper['publicSourceUrl']??''}'.isNotEmpty)OutlinedButton(onPressed:()=>open('${paper['publicSourceUrl']}'),child:const Text('Open paper')),
+            if('${paper['officialVerificationUrl']??''}'.isNotEmpty)OutlinedButton(onPressed:()=>open('${paper['officialVerificationUrl']}'),child:const Text('Official notice')),
           ]),
         ]))),
       const TitleText('Practice and mock tests'),
@@ -750,17 +750,17 @@ class ExamHub extends StatelessWidget{
       else ...practice.map((t)=>TestCard(t:t,tap:()=>instructions(c,t,reload))),
       const TitleText('Results and retakes'),
       Box(color:const Color(0xffe8f5ef),child:Text(
-        latest==null?'Complete a test to see scoring, explanations and topic analysis.':'\${results.length} attempt\${results.length==1?'':'s'} · latest score \${latest['percent']}%. Open Results to review and retake.'
+        latest==null?'Complete a test to see scoring, explanations and topic analysis.':'${results.length} attempt${results.length==1?'':'s'} · latest score ${latest['percent']}%. Open Results to review and retake.'
       )),
       const TitleText('Recruitment stages'),
       ...List<Map<String,dynamic>>.from(exam['stages']??[]).asMap().entries.map((entry)=>Box(child:Row(
         crossAxisAlignment:CrossAxisAlignment.start,
         children:[
-          CircleAvatar(backgroundColor:mint,foregroundColor:forest,child:Text('\${entry.key+1}')),
+          CircleAvatar(backgroundColor:mint,foregroundColor:forest,child:Text('${entry.key+1}')),
           const SizedBox(width:12),
           Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-            Text('\${entry.value['name']}',style:const TextStyle(fontWeight:FontWeight.w900)),
-            Text('\${entry.value['description']}',style:const TextStyle(color:muted)),
+            Text('${entry.value['name']}',style:const TextStyle(fontWeight:FontWeight.w900)),
+            Text('${entry.value['description']}',style:const TextStyle(color:muted)),
           ])),
         ],
       ))),
@@ -778,7 +778,7 @@ class _TestsPage extends State<TestsPage>{
   @override Widget build(BuildContext c){
     final completed=widget.results.map((r)=>r['baseTestId']??r['testId']).toSet();
     final rows=widget.tests.where((t){
-      final text='\${t['title']} \${t['description']} \${t['category']}'.toLowerCase();
+      final text='${t['title']} ${t['description']} ${t['category']}'.toLowerCase();
       final matches=text.contains(query.toLowerCase());
       final done=completed.contains(t['id']);
       return matches&&(status=='all'||status=='completed'&&done||status=='new'&&!done);
@@ -822,9 +822,9 @@ class DiagnosticPage extends StatelessWidget{
           CircleAvatar(backgroundColor:const Color(0xffe8f5ef),child:Icon(paper==null?Icons.schedule:Icons.health_and_safety_outlined,color:blue)),
           const SizedBox(width:12),
           Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-            Text('\${exam['name']}',style:const TextStyle(fontWeight:FontWeight.w900)),
-            Text('\${exam['authority']}',style:const TextStyle(color:muted)),
-            Text(paper==null?'Coming soon':'\${(paper['questions']as List).length} questions · \${((paper['timing']['totalSeconds']as num)/60).round()} minutes'),
+            Text('${exam['name']}',style:const TextStyle(fontWeight:FontWeight.w900)),
+            Text('${exam['authority']}',style:const TextStyle(color:muted)),
+            Text(paper==null?'Coming soon':'${(paper['questions']as List).length} questions · ${((paper['timing']['totalSeconds']as num)/60).round()} minutes'),
           ])),
           if(paper!=null)FilledButton(onPressed:()=>instructions(c,paper,reload,sound:sound),child:const Text('Select')),
         ]));
@@ -863,13 +863,13 @@ class MorePage extends StatelessWidget{
     const Text('More',style:TextStyle(fontSize:28,fontWeight:FontWeight.w900)),
     const SizedBox(height:14),
     Box(child:Column(children:[
-      CircleAvatar(radius:36,backgroundColor:mint,foregroundColor:forest,child:Text('\${u['name']}'[0].toUpperCase(),style:const TextStyle(fontSize:28,fontWeight:FontWeight.w900))),
+      CircleAvatar(radius:36,backgroundColor:mint,foregroundColor:forest,child:Text('${u['name']}'[0].toUpperCase(),style:const TextStyle(fontSize:28,fontWeight:FontWeight.w900))),
       const SizedBox(height:8),
-      Text('\${u['name']}',style:const TextStyle(fontSize:20,fontWeight:FontWeight.w900)),
-      Text('\${u['email']}',style:const TextStyle(color:muted)),
-      if('\${u['mobile']??''}'.isNotEmpty)Text('\${u['mobile']}',style:const TextStyle(color:muted)),
+      Text('${u['name']}',style:const TextStyle(fontSize:20,fontWeight:FontWeight.w900)),
+      Text('${u['email']}',style:const TextStyle(color:muted)),
+      if('${u['mobile']??''}'.isNotEmpty)Text('${u['mobile']}',style:const TextStyle(color:muted)),
     ])),
-    Box(child:ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.flag_outlined,color:blue),title:const Text('Primary exam',style:TextStyle(fontWeight:FontWeight.w800)),subtitle:Text('\${exam['name']}'),trailing:TextButton(onPressed:onChangeGoal,child:const Text('Change')))),
+    Box(child:ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.flag_outlined,color:blue),title:const Text('Primary exam',style:TextStyle(fontWeight:FontWeight.w800)),subtitle:Text('${exam['name']}'),trailing:TextButton(onPressed:onChangeGoal,child:const Text('Change')))),
     Box(child:SwitchListTile(contentPadding:EdgeInsets.zero,value:sound,onChanged:(_)=>onSound(),secondary:const Icon(Icons.volume_up_outlined,color:blue),title:const Text('Test sounds',style:TextStyle(fontWeight:FontWeight.w800)))),
     Box(tap:onGuide,child:const ListTile(contentPadding:EdgeInsets.zero,leading:Icon(Icons.menu_book_outlined,color:blue),title:Text('How to use',style:TextStyle(fontWeight:FontWeight.w800)),trailing:Icon(Icons.chevron_right))),
     OutlinedButton.icon(
@@ -893,17 +893,17 @@ class Instructions extends StatefulWidget{
   @override State<Instructions>createState()=>_Instructions();
 }
 class _Instructions extends State<Instructions>{
-  late String mode='\${widget.t['defaultMode']??'total-timed'}';
-  late String feedback='\${widget.t['feedbackMode']??'on-completion'}';
+  late String mode='${widget.t['defaultMode']??'total-timed'}';
+  late String feedback='${widget.t['feedbackMode']??'on-completion'}';
   String markingMode='default';
   bool accepted=false;
   late final TextEditingController correct,wrong,blank;
   @override void initState(){
     super.initState();
     final m=Map<String,dynamic>.from(widget.t['marking']??{});
-    correct=TextEditingController(text:'\${m['correct']??widget.t['questions']?[0]?['marks']??1}');
-    wrong=TextEditingController(text:'\${m['incorrect']??-NumberTools.numValue(widget.t['negativeMarking'])}');
-    blank=TextEditingController(text:'\${m['unanswered']??0}');
+    correct=TextEditingController(text:'${m['correct']??widget.t['questions']?[0]?['marks']??1}');
+    wrong=TextEditingController(text:'${m['incorrect']??-NumberTools.numValue(widget.t['negativeMarking'])}');
+    blank=TextEditingController(text:'${m['unanswered']??0}');
   }
   @override void dispose(){correct.dispose();wrong.dispose();blank.dispose();super.dispose();}
   void start(){
@@ -943,14 +943,14 @@ class _Instructions extends State<Instructions>{
       body:ListView(padding:const EdgeInsets.fromLTRB(20,20,20,80),children:[
         Pill(diagnostic?'FREE DIAGNOSTIC TEST':'BEFORE YOU BEGIN'),
         const SizedBox(height:8),
-        Text('\${widget.t['title']}',style:const TextStyle(fontSize:27,fontWeight:FontWeight.w900)),
-        Text('\${widget.t['description']}',style:const TextStyle(color:muted)),
+        Text('${widget.t['title']}',style:const TextStyle(fontSize:27,fontWeight:FontWeight.w900)),
+        Text('${widget.t['description']}',style:const TextStyle(color:muted)),
         const TitleText('Paper details'),
         Wrap(spacing:8,runSpacing:8,children:[
-          Chip(label:Text('\${(widget.t['questions']as List).length} questions')),
-          Chip(label:Text('\${widget.t['totalMarks']} marks')),
-          Chip(label:Text('\${((widget.t['timing']['totalSeconds']as num)/60).round()} minutes')),
-          if(diagnostic)Chip(label:Text('+\${marking['correct']} / \${marking['incorrect']} / \${marking['unanswered']}')),
+          Chip(label:Text('${(widget.t['questions']as List).length} questions')),
+          Chip(label:Text('${widget.t['totalMarks']} marks')),
+          Chip(label:Text('${((widget.t['timing']['totalSeconds']as num)/60).round()} minutes')),
+          if(diagnostic)Chip(label:Text('+${marking['correct']} / ${marking['incorrect']} / ${marking['unanswered']}')),
         ]),
         if(diagnostic)...[
           const TitleText('Assessment rules'),
@@ -1028,7 +1028,7 @@ class _TestPage extends State<TestPage>{
   Map<String,dynamic>get marking=>Map<String,dynamic>.from(widget.t['_marking']??widget.t['marking']??{
     'correct':null,'incorrect':-NumberTools.numValue(widget.t['negativeMarking']),'unanswered':0
   });
-  String get markingMode=>'\${widget.t['_markingMode']??'default'}';
+  String get markingMode=>'${widget.t['_markingMode']??'default'}';
 
   @override void initState(){
     super.initState();
@@ -1089,7 +1089,7 @@ class _TestPage extends State<TestPage>{
     context:context,
     builder:(c)=>AlertDialog(
       title:const Text('Submit this test?'),
-      content:Text('\${ans.where((x)=>x!=null).length} answered • \${ans.where((x)=>x==null).length} unanswered • \${review.where((x)=>x).length} for review'),
+      content:Text('${ans.where((x)=>x!=null).length} answered • ${ans.where((x)=>x==null).length} unanswered • ${review.where((x)=>x).length} for review'),
       actions:[
         TextButton(onPressed:()=>Navigator.pop(c),child:const Text('Continue')),
         FilledButton(onPressed:(){Navigator.pop(c);finish();},child:const Text('Submit')),
@@ -1112,14 +1112,14 @@ class _TestPage extends State<TestPage>{
       if(ok){right++;score+=correctMarks;}
       else if(attempted){wrongCount++;score+=NumberTools.numValue(marking['incorrect']);}
       else{score+=NumberTools.numValue(marking['unanswered']);}
-      final topic='\${q['topic']??'General'}';
+      final topic='${q['topic']??'General'}';
       topics.putIfAbsent(topic,()=>{'correct':0,'total':0});
       topics[topic]!['total']=topics[topic]!['total']!+1;
       if(ok)topics[topic]!['correct']=topics[topic]!['correct']!+1;
     }
     final percent=totalMarks<=0?0:max(0,((score/totalMarks)*100).round());
     final result={
-      'id':'result-\${DateTime.now().millisecondsSinceEpoch}',
+      'id':'result-${DateTime.now().millisecondsSinceEpoch}',
       'title':widget.t['title'],'testId':widget.t['id'],'baseTestId':widget.t['baseTestId']??widget.t['id'],
       'type':widget.t['type']??'practice','examId':widget.t['examId']??(widget.t['examIds']as List?)?.first,
       'correct':right,'incorrect':wrongCount,'unanswered':qs.length-right-wrongCount,
@@ -1147,7 +1147,7 @@ class _TestPage extends State<TestPage>{
         Wrap(spacing:8,runSpacing:8,children:List.generate(qs.length,(x)=>FilledButton.tonal(
           onPressed:(){Navigator.pop(c);setState(()=>i=x);if(widget.mode=='question-timed')sec=NumberTools.intValue(widget.t['timing']['questionSeconds']);save();},
           style:FilledButton.styleFrom(backgroundColor:x==i?mint:ans[x]!=null?const Color(0xffdcefe7):review[x]?const Color(0xffffe9b0):null),
-          child:Text('\${x+1}'),
+          child:Text('${x+1}'),
         ))),
       ]),
     )),
@@ -1155,7 +1155,7 @@ class _TestPage extends State<TestPage>{
   @override void dispose(){timer?.cancel();super.dispose();}
   String get time{
     final v=widget.mode=='untimed'?elapsed:sec;
-    return '\${widget.mode=='untimed'?'Elapsed':'Remaining'} \${(v~/60).toString().padLeft(2,'0')}:\${(v%60).toString().padLeft(2,'0')}';
+    return '${widget.mode=='untimed'?'Elapsed':'Remaining'} ${(v~/60).toString().padLeft(2,'0')}:${(v%60).toString().padLeft(2,'0')}';
   }
   @override Widget build(BuildContext c){
     final q=qs[i];
@@ -1167,8 +1167,8 @@ class _TestPage extends State<TestPage>{
         appBar:AppBar(
           leading:IconButton(onPressed:()async{await save();if(c.mounted)Navigator.pop(c);},icon:const Icon(Icons.close)),
           title:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-            Text('\${widget.t['title']}',style:const TextStyle(fontSize:14,fontWeight:FontWeight.w800)),
-            Text('Question \${i+1} of \${qs.length}',style:const TextStyle(fontSize:11)),
+            Text('${widget.t['title']}',style:const TextStyle(fontSize:14,fontWeight:FontWeight.w800)),
+            Text('Question ${i+1} of ${qs.length}',style:const TextStyle(fontSize:11)),
           ]),
           actions:[
             TextButton(onPressed:palette,child:Text(time,style:const TextStyle(fontWeight:FontWeight.w900))),
@@ -1177,13 +1177,13 @@ class _TestPage extends State<TestPage>{
         body:ListView(padding:const EdgeInsets.all(18),children:[
           LinearProgressIndicator(value:(i+1)/qs.length),
           const SizedBox(height:20),
-          Text('\${q['topic']} · \${markingMode=='custom'?marking['correct']:q['marks']??marking['correct']??1} marks',style:const TextStyle(color:blue,fontWeight:FontWeight.w800)),
+          Text('${q['topic']} · ${markingMode=='custom'?marking['correct']:q['marks']??marking['correct']??1} marks',style:const TextStyle(color:blue,fontWeight:FontWeight.w800)),
           const SizedBox(height:8),
-          Text('\${q['question']}',style:const TextStyle(fontSize:22,fontWeight:FontWeight.w900,height:1.3)),
+          Text('${q['question']}',style:const TextStyle(fontSize:22,fontWeight:FontWeight.w900,height:1.3)),
           if(q['code']!=null)Container(
             margin:const EdgeInsets.only(top:12),padding:const EdgeInsets.all(14),
             decoration:BoxDecoration(color:ink,borderRadius:BorderRadius.circular(14)),
-            child:Text('\${q['code']}',style:const TextStyle(color:Colors.white,fontFamily:'monospace')),
+            child:Text('${q['code']}',style:const TextStyle(color:Colors.white,fontFamily:'monospace')),
           ),
           const SizedBox(height:14),
           ...List<String>.from(q['options']).asMap().entries.map((o){
@@ -1196,7 +1196,7 @@ class _TestPage extends State<TestPage>{
               child:RadioListTile<int>(
                 value:o.key,groupValue:ans[i],
                 onChanged:locked?null:(v){setState(()=>ans[i]=v);tone();save();},
-                title:Text('\${String.fromCharCode(65+o.key)}. \${o.value}',style:const TextStyle(fontWeight:FontWeight.w600)),
+                title:Text('${String.fromCharCode(65+o.key)}. ${o.value}',style:const TextStyle(fontWeight:FontWeight.w600)),
               ),
             );
           }),
@@ -1204,7 +1204,7 @@ class _TestPage extends State<TestPage>{
             color:ans[i]==correctIndex?const Color(0xffe8f5ef):const Color(0xffffeeee),
             child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
               Text(ans[i]==correctIndex?'Correct answer':'Incorrect answer',style:const TextStyle(fontWeight:FontWeight.w900)),
-              Text('\${q['explanation']}'),
+              Text('${q['explanation']}'),
             ]),
           ),
           const SizedBox(height:10),
@@ -1242,8 +1242,8 @@ class ResultPage extends StatelessWidget{
     }).toList();
     final copy=Map<String,dynamic>.from(jsonDecode(jsonEncode(t)));
     final base=t['baseTestId']??t['id'];
-    copy['id']='$base-retake-\${DateTime.now().millisecondsSinceEpoch}';
-    copy['baseTestId']=base;copy['title']='\${t['title']} — retake';copy['questions']=qs;
+    copy['id']='$base-retake-${DateTime.now().millisecondsSinceEpoch}';
+    copy['baseTestId']=base;copy['title']='${t['title']} — retake';copy['questions']=qs;
     copy['_marking']=r['marking'];copy['_markingMode']=r['markingMode'];
     return copy;
   }
@@ -1266,24 +1266,24 @@ class ResultPage extends StatelessWidget{
         Center(child:SizedBox(width:155,height:155,child:Stack(alignment:Alignment.center,children:[
           SizedBox.expand(child:CircularProgressIndicator(value:NumberTools.numValue(r['percent'])/100,strokeWidth:14,backgroundColor:const Color(0xffe2e9f3))),
           Column(mainAxisSize:MainAxisSize.min,children:[
-            Text('\${r['percent']}%',style:const TextStyle(fontSize:31,fontWeight:FontWeight.w900)),
-            Text('\${r['score']}/\${r['totalMarks']}',style:const TextStyle(fontSize:11)),
+            Text('${r['percent']}%',style:const TextStyle(fontSize:31,fontWeight:FontWeight.w900)),
+            Text('${r['score']}/${r['totalMarks']}',style:const TextStyle(fontSize:11)),
           ]),
         ]))),
         const SizedBox(height:16),
         Text(diagnostic?'Diagnostic report card':'Your result is ready',textAlign:TextAlign.center,style:const TextStyle(fontSize:26,fontWeight:FontWeight.w900)),
-        Text('\${r['title']}',textAlign:TextAlign.center,style:const TextStyle(color:muted)),
+        Text('${r['title']}',textAlign:TextAlign.center,style:const TextStyle(color:muted)),
         const SizedBox(height:15),
         Row(children:[
-          Expanded(child:Stat('\${r['correct']}','Correct')),const SizedBox(width:8),
-          Expanded(child:Stat('\${r['incorrect']}','Incorrect')),const SizedBox(width:8),
-          Expanded(child:Stat('\${r['unanswered']}','Skipped')),
+          Expanded(child:Stat('${r['correct']}','Correct')),const SizedBox(width:8),
+          Expanded(child:Stat('${r['incorrect']}','Incorrect')),const SizedBox(width:8),
+          Expanded(child:Stat('${r['unanswered']}','Skipped')),
         ]),
         if(diagnostic)...[
           const TitleText('Diagnostic summary'),
           Row(children:[
             Expanded(child:Stat('$accuracy%','Accuracy')),const SizedBox(width:8),
-            Expanded(child:Stat('$attempted/\${questions.length}','Attempted')),const SizedBox(width:8),
+            Expanded(child:Stat('$attempted/${questions.length}','Attempted')),const SizedBox(width:8),
             Expanded(child:Stat(formatSeconds(NumberTools.intValue(r['timeSeconds'])),'Time')),
           ]),
         ],
@@ -1307,10 +1307,10 @@ class ResultPage extends StatelessWidget{
           const Text('Questions and answer options are reshuffled for each retake.',style:TextStyle(color:muted)),
           const SizedBox(height:10),
           Wrap(spacing:8,runSpacing:8,children:[
-            OutlinedButton(onPressed:pick('unanswered').isEmpty?null:()=>retake(c,'unanswered'),child:Text('Unanswered (\${pick('unanswered').length})')),
-            OutlinedButton(onPressed:pick('review').isEmpty?null:()=>retake(c,'review'),child:Text('Unanswered + wrong (\${pick('review').length})')),
-            OutlinedButton(onPressed:pick('wrong').isEmpty?null:()=>retake(c,'wrong'),child:Text('Wrong (\${pick('wrong').length})')),
-            FilledButton(onPressed:()=>retake(c,'all'),child:Text('All (\${pick('all').length})')),
+            OutlinedButton(onPressed:pick('unanswered').isEmpty?null:()=>retake(c,'unanswered'),child:Text('Unanswered (${pick('unanswered').length})')),
+            OutlinedButton(onPressed:pick('review').isEmpty?null:()=>retake(c,'review'),child:Text('Unanswered + wrong (${pick('review').length})')),
+            OutlinedButton(onPressed:pick('wrong').isEmpty?null:()=>retake(c,'wrong'),child:Text('Wrong (${pick('wrong').length})')),
+            FilledButton(onPressed:()=>retake(c,'all'),child:Text('All (${pick('all').length})')),
           ]),
         ]else...[
           const TitleText('Focus areas'),
@@ -1322,11 +1322,11 @@ class ResultPage extends StatelessWidget{
           final a=e.key<ans.length?ans[e.key]:null;
           final correct=NumberTools.intValue(e.value['correctOption']);
           return Box(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-            Text('\${e.key+1}. \${e.value['question']}',style:const TextStyle(fontWeight:FontWeight.w800)),
+            Text('${e.key+1}. ${e.value['question']}',style:const TextStyle(fontWeight:FontWeight.w800)),
             const SizedBox(height:5),
-            Text(a==null?'Not answered':'Your answer: \${e.value['options'][a]}'),
-            Text('Correct: \${e.value['options'][correct]}',style:const TextStyle(color:Colors.green)),
-            Text('\${e.value['explanation']}',style:const TextStyle(color:muted)),
+            Text(a==null?'Not answered':'Your answer: ${e.value['options'][a]}'),
+            Text('Correct: ${e.value['options'][correct]}',style:const TextStyle(color:Colors.green)),
+            Text('${e.value['explanation']}',style:const TextStyle(color:muted)),
           ]));
         }),
         FilledButton(onPressed:()=>Navigator.pop(c),child:const Text('Return')),
@@ -1356,11 +1356,11 @@ class ResultsPage extends StatelessWidget{
       ...items.map((raw){
         final r=Map<String,dynamic>.from(raw);
         return Box(tap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>ResultPage(t:testFor(r),r:r,done:reload,sound:sound))),child:Row(children:[
-          CircleAvatar(radius:27,backgroundColor:r['passed']==true?const Color(0xffe8f5ef):const Color(0xfffff6df),foregroundColor:r['passed']==true?Colors.green:Colors.orange,child:Text('\${r['percent']}%',style:const TextStyle(fontWeight:FontWeight.w900,fontSize:12))),
+          CircleAvatar(radius:27,backgroundColor:r['passed']==true?const Color(0xffe8f5ef):const Color(0xfffff6df),foregroundColor:r['passed']==true?Colors.green:Colors.orange,child:Text('${r['percent']}%',style:const TextStyle(fontWeight:FontWeight.w900,fontSize:12))),
           const SizedBox(width:12),
           Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-            Text('\${r['title']}',style:const TextStyle(fontWeight:FontWeight.w900)),
-            Text('\${dateOnly(r['date'])} · \${r['correct']} correct · \${formatSeconds(NumberTools.intValue(r['timeSeconds']))}',style:const TextStyle(color:muted)),
+            Text('${r['title']}',style:const TextStyle(fontWeight:FontWeight.w900)),
+            Text('${dateOnly(r['date'])} · ${r['correct']} correct · ${formatSeconds(NumberTools.intValue(r['timeSeconds']))}',style:const TextStyle(color:muted)),
           ])),
           const Icon(Icons.chevron_right),
         ]));
@@ -1383,11 +1383,11 @@ class ExamCard extends StatelessWidget{
           CircleAvatar(backgroundColor:const Color(0xffe8f5ef),child:Icon(on?Icons.check:available?Icons.local_police_outlined:Icons.schedule,color:blue)),
           const SizedBox(width:12),
           Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-            Row(children:[Expanded(child:Text('\${e['name']}',style:const TextStyle(fontSize:17,fontWeight:FontWeight.w900))),if(!available)const Chip(label:Text('Coming soon'))]),
-            Text('\${e['authority']}',style:const TextStyle(fontSize:12,color:blue)),
+            Row(children:[Expanded(child:Text('${e['name']}',style:const TextStyle(fontSize:17,fontWeight:FontWeight.w900))),if(!available)const Chip(label:Text('Coming soon'))]),
+            Text('${e['authority']}',style:const TextStyle(fontSize:12,color:blue)),
             const SizedBox(height:5),
-            Text('\${e['description']}',style:const TextStyle(color:muted,height:1.35)),
-            if(available)...[const SizedBox(height:7),Text('\${e['status']}',style:const TextStyle(fontSize:12,fontWeight:FontWeight.w700))],
+            Text('${e['description']}',style:const TextStyle(color:muted,height:1.35)),
+            if(available)...[const SizedBox(height:7),Text('${e['status']}',style:const TextStyle(fontSize:12,fontWeight:FontWeight.w700))],
           ])),
           if(available)const Icon(Icons.chevron_right),
         ]),
@@ -1402,11 +1402,11 @@ class TestCard extends StatelessWidget{
   @override Widget build(BuildContext c)=>Box(
     tap:tap,
     child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-      Row(children:[Icon(t['type']=='diagnostic'?Icons.health_and_safety_outlined:Icons.assignment_outlined,color:blue),const Spacer(),Chip(label:Text('\${t['difficulty']??'Practice'}'))]),
-      Text('\${t['title']}',style:const TextStyle(fontSize:18,fontWeight:FontWeight.w900)),
-      Text('\${t['description']}',style:const TextStyle(color:muted)),
+      Row(children:[Icon(t['type']=='diagnostic'?Icons.health_and_safety_outlined:Icons.assignment_outlined,color:blue),const Spacer(),Chip(label:Text('${t['difficulty']??'Practice'}'))]),
+      Text('${t['title']}',style:const TextStyle(fontSize:18,fontWeight:FontWeight.w900)),
+      Text('${t['description']}',style:const TextStyle(color:muted)),
       const SizedBox(height:9),
-      Text('\${(t['questions']as List).length} questions · \${t['totalMarks']} marks · \${((t['timing']['totalSeconds']as num)/60).round()} min',style:const TextStyle(fontWeight:FontWeight.w700)),
+      Text('${(t['questions']as List).length} questions · ${t['totalMarks']} marks · ${((t['timing']['totalSeconds']as num)/60).round()} min',style:const TextStyle(fontWeight:FontWeight.w700)),
       const Align(alignment:Alignment.centerRight,child:Text('View instructions →',style:TextStyle(color:blue,fontWeight:FontWeight.w800))),
     ]),
   );
@@ -1500,11 +1500,11 @@ class NumberTools{
   static int intValue(dynamic v,{int fallback=0}){
     if(v is int)return v;
     if(v is num)return v.toInt();
-    return int.tryParse('\${v??''}')??fallback;
+    return int.tryParse('${v??''}')??fallback;
   }
   static num numValue(dynamic v,{num fallback=0}){
     if(v is num)return v;
-    return num.tryParse('\${v??''}')??fallback;
+    return num.tryParse('${v??''}')??fallback;
   }
   static double ratio(dynamic value){
     if(value is! Map)return 0;
@@ -1518,10 +1518,10 @@ String dayPart(){
   return h<12?'morning':h<17?'afternoon':'evening';
 }
 String dateOnly(dynamic value){
-  final s='\${value??''}';
+  final s='${value??''}';
   return s.length>=10?s.substring(0,10):s;
 }
 String formatSeconds(int seconds){
   final safe=max(0,seconds),h=safe~/3600,m=(safe%3600)~/60,s=safe%60;
-  return h>0?'\${h.toString()}:\${m.toString().padLeft(2,'0')}:\${s.toString().padLeft(2,'0')}':'\${m.toString().padLeft(2,'0')}:\${s.toString().padLeft(2,'0')}';
+  return h>0?'${h.toString()}:${m.toString().padLeft(2,'0')}:${s.toString().padLeft(2,'0')}':'${m.toString().padLeft(2,'0')}:${s.toString().padLeft(2,'0')}';
 }
