@@ -120,8 +120,9 @@ Future<List<dynamic>> syncResultsWithServer(List<dynamic> local)async{
   final token=await Store.string('token');
   if(token==null)return local;
   try{
-    if(local.isNotEmpty){
-      await Api.auth('results',body:{'results':local.take(100).toList()},token:token);
+    final upload=local.take(500).toList();
+    for(var offset=0;offset<upload.length;offset+=100){
+      await Api.auth('results',body:{'results':upload.skip(offset).take(100).toList()},token:token);
     }
     final remote=await Api.auth('results',token:token);
     final merged=<String,Map<String,dynamic>>{};

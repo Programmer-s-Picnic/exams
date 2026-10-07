@@ -40,8 +40,10 @@
   async function syncResultsWithServer() {
     if (!state.user || !authToken()) return TestEngine.getResults();
     try {
-      const local = TestEngine.getResults();
-      if (local.length) await Api.auth('results', { results: local.slice(0, 100) }, authToken());
+      const local = TestEngine.getResults().slice(0, 500);
+      for (let offset = 0; offset < local.length; offset += 100) {
+        await Api.auth('results', { results: local.slice(offset, offset + 100) }, authToken());
+      }
       const remote = await Api.auth('results', undefined, authToken());
       return TestEngine.mergeResults(remote.results || []);
     } catch (error) {
