@@ -10,7 +10,10 @@
       if (!login || !password) { status.textContent = 'Enter your login and password.'; return; }
       button.disabled = true; status.textContent = 'Signing in…';
       try {
-        const result = await Api.auth('login', {login, password});
+        const testing = login === 'admin';
+        const result = testing
+          ? await Api.auth('admin', {action:'temporary-login', username:login, password})
+          : await Api.auth('login', {login, password});
         await Api.auth('admin', undefined, result.token);
         sessionStorage.setItem('he_admin_token', result.token);
         await window.AdminConsole.render(state, result.token);
@@ -33,7 +36,10 @@
     }
     if (location.hash !== '#/admin') return;
     mount.innerHTML = `<section class="admin-standalone"><header class="admin-shell-header"><div><img src="favicon.svg?v=upnaukriguru" alt="" width="48" height="48"><span><strong>UP NaukriGuru Administration</strong><small>Content, validation and student management</small></span></div><div><a class="ghost-button" href="#/landing">Open student site</a><button class="ghost-button" id="adminSignOut" type="button">Sign out</button></div></header><div class="page admin-page"><div class="page-hero compact"><span class="eyebrow">ADMINISTRATION</span><h1>Administration dashboard</h1><p>Manage exam content, validations and student registrations.</p></div><div class="admin-console"><aside class="admin-menu"><button data-panel="overview" class="active">Overview</button><button data-panel="validation">Validation</button><button data-panel="content">Exam content</button><button data-panel="students">Students</button><button data-panel="guide">How to use</button></aside><article class="admin-workspace" id="adminWorkspace"></article></div></div><footer class="admin-product-footer">Developed and maintained by <strong>Champak Roy</strong></footer></section>`;
-    document.getElementById('adminSignOut').onclick = () => {
+    document.getElementById('adminSignOut').onclick = async () => {
+      if (info.testing) {
+        try { await Api.auth('admin', {action:'temporary-logout'}, token); } catch (_) {}
+      }
       sessionStorage.removeItem('he_admin_token');
       location.hash = '#/admin';
       location.reload();

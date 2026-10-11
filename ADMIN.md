@@ -16,3 +16,9 @@ The administrator panel allows management of exam content and syllabus/paper app
 Students and administrators use `https://cserver.learnwithchampak.live/exams/api` for account authentication. Registration records and test results reside in the server's dedicated `exams` MySQL database, while the question bank, exams, paper documents, and validation metadata remain served from JSON.
 
 For the database setup, see [cserver Exams cutover guide](https://github.com/Programmer-s-Picnic/cserver/blob/exams-dedicated-mysql-20261011/exams/DATABASE_CUTOVER.md). The backend must be activated before this frontend update.
+
+## Time-limited testing access
+
+During testing, the website also supports a temporary username `admin` with a **randomly generated, unique password** from the private GoDaddy configuration. This is not the old `admin/admin` credential. The test account has full administrator permissions from any IP address and expires automatically after 10 days; tokens expire after one hour. The real administrator's email-based login remains available.
+
+The password is generated once on the hosting server. In cPanel File Manager, open `~/private/exams-test-admin-credentials.txt`, copy the password securely, **then delete that file**. Never share it or include it in a screenshot. For setup and expiry details, see the [server testing-admin instructions](https://github.com/Programmer-s-Picnic/cserver/blob/main/exams/TESTING_ADMIN.md).
