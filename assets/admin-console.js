@@ -1,7 +1,7 @@
 (function () {
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   function renderAdminLogin(mount, state, message = '') {
-    mount.innerHTML = `<section class="admin-standalone"><div class="admin-login-card"><img src="favicon.svg?v=upnaukriguru" alt="" width="64" height="64"><span class="eyebrow">UP NAUKRIGURU ADMINISTRATION</span><h1>Admin sign in</h1><p>Use an authorised administrator account.</p>${message ? `<p class="form-error">${esc(message)}</p>` : ''}<label>Username<input id="adminLoginId" autocomplete="username" value="admin"></label><label>Password<input id="adminLoginPassword" type="password" autocomplete="current-password" value="admin"></label><button class="primary-button full" id="adminLoginButton">Sign in</button><p class="admin-status" id="adminLoginStatus"></p><p class="admin-developer-credit">Developed and maintained by <strong>Champak Roy</strong></p></div></section>`;
+    mount.innerHTML = `<section class="admin-standalone"><div class="admin-login-card"><img src="favicon.svg?v=upnaukriguru" alt="" width="64" height="64"><span class="eyebrow">UP NAUKRIGURU ADMINISTRATION</span><h1>Admin sign in</h1><p>Use an authorised administrator account.</p>${message ? `<p class="form-error">${esc(message)}</p>` : ''}<label>Email or mobile<input id="adminLoginId" autocomplete="username" placeholder="Registered Exams email or mobile"></label><label>Password<input id="adminLoginPassword" type="password" autocomplete="current-password"></label><button class="primary-button full" id="adminLoginButton">Sign in</button><p class="admin-status" id="adminLoginStatus"></p><p class="admin-developer-credit">Developed and maintained by <strong>Champak Roy</strong></p></div></section>`;
     const button = document.getElementById('adminLoginButton');
     button.onclick = async () => {
       const login = document.getElementById('adminLoginId').value.trim();
@@ -10,7 +10,8 @@
       if (!login || !password) { status.textContent = 'Enter your login and password.'; return; }
       button.disabled = true; status.textContent = 'Signing in…';
       try {
-        const result = await Api.auth('admin', {action:'temporary-login', username:login, password});
+        const result = await Api.auth('login', {login, password});
+        await Api.auth('admin', undefined, result.token);
         sessionStorage.setItem('he_admin_token', result.token);
         await window.AdminConsole.render(state, result.token);
       } catch (error) {
