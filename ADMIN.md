@@ -19,4 +19,6 @@ For the database setup, see [cserver Exams cutover guide](https://github.com/Pro
 
 ## Time-limited testing access
 
-The admin login page supports a separate temporary testing account for approved networks during October 2026. Testing access is **not public to arbitrary IP addresses**: the hosting administrator must enable `testing_access` in `~/private/exams-admin.php` and explicitly allow the testers' public IP addresses. The server enforces an automatic expiry, 60-minute sessions, rate limiting and logout revocation. The ordinary administrator email allowlist remains active. See the [server setup instructions](https://github.com/Programmer-s-Picnic/cserver/blob/main/exams/TESTING_ADMIN.md).
+During testing, the website also supports a temporary username `admin` with a **randomly generated, unique password** from the private GoDaddy configuration. This is not the old `admin/admin` credential. The test account has full administrator permissions from any IP address and expires automatically after 10 days; tokens expire after one hour. The real administrator's email-based login remains available.
+
+The password is generated once on the hosting server. In cPanel File Manager, open `~/private/exams-test-admin-credentials.txt`, copy the password securely, **then delete that file**. Never share it or include it in a screenshot. For setup and expiry details, see the [server testing-admin instructions](https://github.com/Programmer-s-Picnic/cserver/blob/main/exams/TESTING_ADMIN.md).
