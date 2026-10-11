@@ -427,6 +427,7 @@ class _Login extends State<Login>{
           ),
           const SizedBox(height:8),
           TextButton(onPressed:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>Register(d:widget.d,exam:widget.exam,test:widget.test))),child:const Text('New student? Create an account')),
+          TextButton(onPressed:()=>launchUrl(Uri.parse('https://naukripreps.com/privacy/'),mode:LaunchMode.externalApplication),child:const Text('Privacy policy')),
         ]),
       ),
     ))),
@@ -1081,6 +1082,8 @@ class MorePage extends StatelessWidget{
     Box(child:ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.flag_outlined,color:blue),title:const Text('Primary exam',style:TextStyle(fontWeight:FontWeight.w800)),subtitle:Text('${exam['name']}'),trailing:TextButton(onPressed:onChangeGoal,child:const Text('Change')))),
     Box(child:SwitchListTile(contentPadding:EdgeInsets.zero,value:sound,onChanged:(_)=>onSound(),secondary:const Icon(Icons.volume_up_outlined,color:blue),title:const Text('Test sounds',style:TextStyle(fontWeight:FontWeight.w800)))),
     Box(tap:onGuide,child:const ListTile(contentPadding:EdgeInsets.zero,leading:Icon(Icons.menu_book_outlined,color:blue),title:Text('How to use',style:TextStyle(fontWeight:FontWeight.w800)),trailing:Icon(Icons.chevron_right))),
+    Box(tap:(){ launchUrl(Uri.parse('https://naukripreps.com/privacy/'),mode:LaunchMode.externalApplication); },child:const ListTile(contentPadding:EdgeInsets.zero,leading:Icon(Icons.privacy_tip_outlined,color:blue),title:Text('Privacy policy',style:TextStyle(fontWeight:FontWeight.w800)),trailing:Icon(Icons.open_in_new))),
+    Box(tap:(){ launchUrl(Uri.parse('https://naukripreps.com/delete-account/'),mode:LaunchMode.externalApplication); },child:const ListTile(contentPadding:EdgeInsets.zero,leading:Icon(Icons.person_remove_outlined,color:blue),title:Text('Request account deletion',style:TextStyle(fontWeight:FontWeight.w800)),trailing:Icon(Icons.open_in_new))),
     OutlinedButton.icon(
       onPressed:()async{
         final token=await Store.string('token');
