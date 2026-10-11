@@ -1,27 +1,18 @@
 # Exams administration
 
-Open https://programmer-s-picnic.github.io/exams/#/admin and sign in.
+The site is transitioning to the dedicated MySQL database `exams`. **Activate the server database configuration and import existing Exams accounts/results before merging this UI update.**
 
-## One-time hosting setup
-
-In cPanel File Manager, create `private/exams-admin.php` next to the existing private `db.php`, outside `public_html` (the API uses the same parent-of-document-root convention as the database configuration).
+The private admin credential allowlist belongs in `~/private/exams-admin.php`, outside `public_html`:
 
 ```php
 <?php
-return ['emails' => ['your-admin@example.com']];
+return ['emails' => ['your-registered-admin@example.com']];
 ```
 
-Use the email of an existing Exams account owned by the administrator. Add other approved admin emails to this list as needed. Do not place this file in the public site or commit it to GitHub. The folder for backups, `private/exams-content-backups`, is created when saving; PHP needs write permission there and to `exams/json`.
+Register or migrate an Exams account using that email. At `https://naukripreps.com/#/admin`, sign in with the same **Exams account email/mobile and password**. The old temporary `admin/admin` credentials are disabled. Ordinary student accounts do not gain admin privileges.
 
-## Use
+The administrator panel allows management of exam content and syllabus/paper approval. JSON changes are backed up to `~/private/exams-content-backups` before publishing. The server validates data and prevents stale-revision overwrites.
 
-- Overview shows exam, paper and registration counts.
-- Exam content loads and edits site-main.json, exams.json, tests.json and exam-syllabus.json directly on the server.
-- Validate JSON checks syntax; the server checks required structure on saving.
-- Download copy saves the current editor contents.
-- Saving requires the same revision that was loaded. A newer server version causes a conflict and requires reloading.
-- A private backup is required before publishing each update.
-- Students lists the latest 200 registrations; passwords and tokens are excluded.
-- Files & diagrams opens the public documentation inventory.
+Students and administrators use `https://cserver.learnwithchampak.live/exams/api` for account authentication. Registration records and test results reside in the server's dedicated `exams` MySQL database, while the question bank, exams, paper documents, and validation metadata remain served from JSON.
 
-Reports and attempts remain stored on student devices; they are not available as central reports. Content changes made through admin are live server changes; a future deployment overwriting JSON can replace them. Keep a downloaded copy of important updates.
+For the database setup, see [cserver Exams cutover guide](https://github.com/Programmer-s-Picnic/cserver/blob/exams-dedicated-mysql-20261011/exams/DATABASE_CUTOVER.md). The backend must be activated before this frontend update.
