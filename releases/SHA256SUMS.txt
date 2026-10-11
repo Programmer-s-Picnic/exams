@@ -1,0 +1,3 @@
+9fbc5e13f45926b35bda1806cf6d96fee0d6a9d36e36c429d7b19dda00ef9c04  releases/exampreps-64.apk
+381c80266618839f5f2392a6bcf5749a1af4c37db9b1047438ef2d25de025230  releases/exampreps-32.apk
+eb3e7b4b1fc442c36e7332801ed8ea01c38c6aa743b963783768ab1ff91d3e56  releases/exampreps-playstore.aab
