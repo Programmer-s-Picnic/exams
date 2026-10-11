@@ -67,6 +67,14 @@ jobs:
           git add releases/exampreps-64.apk releases/exampreps-32.apk releases/exampreps-playstore.aab releases/SHA256SUMS.txt
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "Publish signed Exams APKs and Play AAB"
+          git stash --include-untracked
+          git fetch origin main
+          BUILT_VERSION=$(git show HEAD:flutter_app/pubspec.yaml | sed -n 's/^version: //p')
+          LIVE_VERSION=$(git show origin/main:flutter_app/pubspec.yaml | sed -n 's/^version: //p')
+          if [ "$BUILT_VERSION" != "$LIVE_VERSION" ]; then
+            echo "Skipping stale Android build $BUILT_VERSION; current source is $LIVE_VERSION"
+            exit 0
+          fi
           git pull --rebase origin main
           git push origin HEAD:main
       - uses: actions/upload-artifact@v4
