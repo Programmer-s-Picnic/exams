@@ -4,6 +4,9 @@
   let timerId = null;
   let resultHandler = null;
   let currentUserId = null;
+  // Full signed-in history is cached in memory when browser storage reaches its quota.
+  // The server retains the authoritative record for every saved attempt.
+  let resultsCache = null;
   // Guest results exist only in RAM while the report or answer review is open.
   let transientGuestResult = null;
   function temporaryGuestResult(id) {
@@ -376,7 +379,7 @@
     } else {
       const results = getResults();
       results.unshift(result);
-      localStorage.setItem(RESULT_KEY, JSON.stringify(results.slice(0, 500)));
+      persistResults(results);
       localStorage.removeItem(STORAGE_KEY);
       if (resultHandler) Promise.resolve(resultHandler(result)).catch(() => {});
     }
@@ -387,7 +390,23 @@
 
   function getResults() {
     if (currentUserId === null) return [];
-    try { return JSON.parse(localStorage.getItem(RESULT_KEY)) || []; } catch (_) { return []; }
+    if (resultsCache !== null) return resultsCache;
+    try {
+      const value = JSON.parse(localStorage.getItem(RESULT_KEY));
+      resultsCache = Array.isArray(value) ? value : [];
+    } catch (_) { resultsCache = []; }
+    return resultsCache;
+  }
+  function persistResults(results) {
+    resultsCache = results;
+    try {
+      localStorage.setItem(RESULT_KEY, JSON.stringify(results));
+    } catch (error) {
+      // Do not destroy previously cached report cards when browser quota is full.
+      // Keep the full archive in RAM and synchronize it to the student server.
+      console.warn('Browser report-card cache is full; server history remains authoritative.', error);
+    }
+    return resultsCache;
   }
   function mergeResults(incoming = []) {
     if (currentUserId === null) return [];
@@ -397,9 +416,8 @@
       const current = map.get(String(result.id));
       if (!current || String(result.date || '') >= String(current.date || '')) map.set(String(result.id), result);
     });
-    const merged = [...map.values()].sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).slice(0, 500);
-    localStorage.setItem(RESULT_KEY, JSON.stringify(merged));
-    return merged;
+    const merged = [...map.values()].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+    return persistResults(merged);
   }
   function setResultHandler(handler) { resultHandler = typeof handler === 'function' ? handler : null; }
 
@@ -421,6 +439,7 @@
     stop(); state.test = null;
     clearTemporaryGuestResult();
     currentUserId = id == null ? null : String(id);
+    resultsCache = null;
     const suffix = id == null ? 'guest' : String(id);
     STORAGE_KEY = `he_active_attempt_v2_${suffix}`;
     RESULT_KEY = `he_results_v2_${suffix}`;
