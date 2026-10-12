@@ -121,8 +121,12 @@
     if (diagnostic && (currentUserId === null ? test.audience !== 'guest' : test.audience === 'guest')) return false;
     let preparedQuestions = test.questions;
     if (diagnostic && currentUserId !== null) {
-      if (saved?.testId === test.id && Array.isArray(saved.questions) && saved.questions.length === test.questions.length) {
-        preparedQuestions = saved.questions;
+      if (saved?.testId === test.id) {
+        // Existing attempts must keep the same question and option order, even
+        // when saved by an older version without an embedded question snapshot.
+        preparedQuestions = Array.isArray(saved.questions) && saved.questions.length
+          ? saved.questions
+          : test.questions;
       } else {
         const previous = getResults().find(result => result.testId === test.id)?.questions;
         preparedQuestions = randomizedDiagnosticQuestions(test.questions);
