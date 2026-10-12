@@ -17,6 +17,35 @@
     filters: { query: '', exam: 'all', status: 'all' }
   };
 
+  function guestNotice() {
+    if (state.user) return '<div class="guest-access-note">You are signed in. You can take additional diagnostic tests and save your results.</div>';
+    const guest = TestEngine.guestDiagnosticStatus();
+    if (guest.state === 'completed') return '<div class="guest-access-note"><strong>Your first diagnostic and report are free — no login required.</strong> You have used your guest attempt. <a href="#/result/' + encodeURIComponent(guest.resultId) + '">View your report</a>. <a href="#/register">Create a free account</a> or <a href="#/login">sign in</a> for another attempt.</div>';
+    if (guest.state === 'in-progress') return '<div class="guest-access-note"><strong>One free diagnostic and full report without login.</strong> You already started your guest test. Resume it to receive your report; registration or login is required for additional attempts.</div>';
+    if (guest.state === 'locked') return '<div class="guest-access-note"><strong>One free diagnostic and full report without login.</strong> Your guest test was already started. <a href="#/register">Register</a> or <a href="#/login">sign in</a> to attempt another.</div>';
+    return '<div class="guest-access-note"><strong>1 diagnostic test + full report FREE, no registration needed.</strong> For any additional attempt, create a free account or sign in. Your guest report is stored in this browser until you save it to an account.</div>';
+  }
+  function guestClaimBanner() {
+    return state.user && TestEngine.guestTransferAvailable()
+      ? '<article class="guest-claim-banner"><div><strong>Save your free guest diagnostic report</strong><p>A report from this browser is available. You can choose to attach it to your signed-in account for future tracking.</p></div><button type="button" class="primary-button" data-claim-guest>Save report to my account</button></article>'
+      : '';
+  }
+  function wireGuestClaim() {
+    document.querySelectorAll('[data-claim-guest]').forEach(button => button.addEventListener('click', async () => {
+      button.disabled = true;
+      if (!TestEngine.claimGuestDiagnostic()) { button.disabled = false; return; }
+      await syncResultsWithServer();
+      toast('Guest diagnostic added to your account. Your report remains available here.');
+      route();
+    }));
+  }
+  function renderGuestLimit() {
+    const guest = TestEngine.guestDiagnosticStatus();
+    const reportLink = guest.resultId ? '<a class="primary-button" href="#/result/' + encodeURIComponent(guest.resultId) + '">View my free report →</a>' : '';
+    const resumeLink = guest.state === 'in-progress' ? '<a class="primary-button" href="#/attempt/' + encodeURIComponent(guest.testId) + '">Resume my free diagnostic →</a>' : '';
+    document.getElementById('app').innerHTML = '<section class="page narrow diagnostic-page"><article class="guest-limit-card"><span class="eyebrow">GUEST ACCESS</span><h1>Your one free diagnostic attempt has been used</h1><p>One diagnostic test and its complete report are available without registration. To take another diagnostic, register or sign in. Your first report remains accessible in this browser.</p><div class="guest-limit-actions">' + reportLink + resumeLink + '<a class="primary-button" href="#/register">Create a free account →</a><a class="ghost-button" href="#/login">Already registered? Sign in</a></div></article></section>';
+  }
+
   function read(key) {
     try { return JSON.parse(localStorage.getItem(key)); } catch (_) { return null; }
   }
@@ -209,6 +238,7 @@
       help: renderHelp
     };
     (routes[name] || (state.user ? renderDashboard : renderLanding))();
+    wireGuestClaim();
     const syncButton = document.getElementById('syncResultsNow');
     if (syncButton) syncButton.onclick = async () => {
       syncButton.disabled = true;
@@ -228,6 +258,9 @@
       return `<div><strong>${value}</strong><span>${item.label}</span></div>`;
     }).join('');
     const featuredTest = state.tests.find(test => test.available) || state.tests[0];
+    const guest = state.user ? null : TestEngine.guestDiagnosticStatus();
+    const diagnosticHeroLabel = guest?.state === 'completed' ? 'View My Free Diagnostic Report →' : guest?.state === 'in-progress' ? 'Resume My Free Diagnostic →' : '1 Free Diagnostic + Report →';
+    const diagnosticHeroRoute = guest?.state === 'completed' ? '#/result/' + encodeURIComponent(guest.resultId) : guest?.state === 'in-progress' ? '#/attempt/' + encodeURIComponent(guest.testId) : '#/diagnostic';
     document.getElementById('app').innerHTML = `
       <div class="public-landing">
         <section class="landing-hero">
@@ -236,7 +269,8 @@
             <span class="landing-badge">◆ ${content.badge}</span>
             <h1>${content.titleBefore}<br><em>${content.titleHighlight}</em></h1>
             <p>${content.description}</p>
-            <div class="landing-actions"><a class="mint-button" href="#/diagnostic">Take Free Diagnostic Test →</a><a class="dark-button" href="${content.primaryAction.route}">${content.primaryAction.label} →</a></div>
+            <div class="landing-actions"><a class="mint-button" href="${diagnosticHeroRoute}">${diagnosticHeroLabel}</a><a class="dark-button" href="#/landing-exams">Explore Exams & Practice →</a></div>
+            ${guestNotice()}
             <div class="capability-grid">${capabilities}</div>
           </div>
         </section>
@@ -247,7 +281,7 @@
         <section class="landing-section diagnostic-section">
           <article class="diagnostic-panel">
             <div><span class="landing-eyebrow">${content.diagnostic.eyebrow}</span><h2>${content.diagnostic.title}</h2><p>${content.diagnostic.description}</p><div class="diagnostic-facts">${content.diagnostic.facts.map(fact => `<span>✓ ${fact}</span>`).join('')}</div></div>
-            <div class="diagnostic-preview"><span class="preview-label">${featuredTest.category}</span><h3>${featuredTest.title}</h3><div><b>${featuredTest.questions.length}</b><small>Questions</small></div><div><b>${Math.round(featuredTest.timing.totalSeconds / 60)}</b><small>Minutes</small></div><a class="mint-button" href="#/diagnostic">${content.diagnostic.actionLabel} →</a></div>
+            <div class="diagnostic-preview"><span class="preview-label">${featuredTest.category}</span><h3>${featuredTest.title}</h3><div><b>${featuredTest.questions.length}</b><small>Questions</small></div><div><b>${Math.round(featuredTest.timing.totalSeconds / 60)}</b><small>Minutes</small></div><a class="mint-button" href="${diagnosticHeroRoute}">${guest?.state === 'completed' ? 'View your free report' : 'Take one free diagnostic + report'} →</a></div>
           </article>
         </section>
         <section class="landing-section" id="landingHow">
@@ -340,7 +374,7 @@
             <button class="primary-button full" type="submit">Sign in securely →</button>
           </form>
           <div class="google-auth" id="googleLogin" hidden></div>
-          <p class="auth-switch">New student? <a href="#/register">Create an account</a></p>
+          <p class="auth-switch">Already used your free diagnostic? Sign in for another attempt. <a href="#/register">Create a free account</a> if you are new.</p>
           <div class="trust-row"><span>✓ Student-first design</span><span>✓ Progress saved</span></div>
         </article>
       </section>`;
@@ -374,7 +408,7 @@
         <label>Confirm password<input name="password_confirmation" type="password" autocomplete="new-password" minlength="8" required></label>
         <p class="form-error" id="registerError" role="alert"></p>
         <button class="primary-button full" type="submit">Register →</button>
-      </form><div class="google-auth" id="googleRegister" hidden></div><p class="auth-switch">Already registered? <a href="#/login">Sign in</a></p>
+      </form><div class="google-auth" id="googleRegister" hidden></div><p class="auth-switch">Your first guest diagnostic and report are free. Register to take additional tests and save progress. Already registered? <a href="#/login">Sign in</a></p>
     </article></section>`;
     document.getElementById('registerForm').addEventListener('submit', async event => {
       event.preventDefault();
@@ -399,6 +433,7 @@
     document.getElementById('app').innerHTML = `
       <section class="onboarding-page">
         <div class="stepbar"><button class="icon-button" id="onboardingBack">←</button><span><i></i>Step 1 of 2 · Personalise your plan</span><a href="#/help" class="icon-button">?</a></div>
+        ${guestClaimBanner()}
         <div class="onboarding-hero">
           <span class="eyebrow">${copy.eyebrow}</span>
           <h1>${copy.title}</h1>
@@ -479,6 +514,7 @@
     const nextTest = relevantTests.find(test => !completedIds.has(test.id)) || relevantTests[0];
     document.getElementById('app').innerHTML = `
       <section class="page dashboard">
+        ${guestClaimBanner()}
         <div class="welcome-row"><div><span class="eyebrow">${copy.eyebrow}</span><h1>Good ${dayPart()}, ${escapeHtml(state.user.name.split(' ')[0])}</h1><p>${copy.description}</p></div><a class="ghost-button" href="#/onboarding">Change goal</a></div>
         <article class="focus-card" id="primaryExamCard" role="link" tabindex="0" aria-label="Open UP Police Constable exam">
           <div class="focus-copy"><span class="live-pill">● PRIMARY GOAL</span><h2>${primary?.name || 'Choose an examination'}</h2><p>${primary?.description || ''}</p><div class="focus-meta"><span>Authority <b>${primary?.authority || '—'}</b></span><span>Status <b>${primary?.status || '—'}</b></span></div></div>
