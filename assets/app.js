@@ -85,12 +85,23 @@
   async function syncResultsWithServer() {
     if (!state.user || !authToken()) return TestEngine.getResults();
     try {
-      const local = TestEngine.getResults().slice(0, 500);
+      const local = TestEngine.getResults();
       for (let offset = 0; offset < local.length; offset += 100) {
         await Api.auth('results', { results: local.slice(offset, offset + 100) }, authToken());
       }
-      const remote = await Api.auth('results', undefined, authToken());
-      return TestEngine.mergeResults(remote.results || []);
+      const allRemote = [];
+      let offset = 0;
+      const pageSize = 100;
+      while (true) {
+        const page = await Api.auth('results', undefined, authToken(), { offset, limit: pageSize });
+        const rows = Array.isArray(page.results) ? page.results : [];
+        allRemote.push(...rows);
+        if (!page.hasMore) break;
+        const nextOffset = Number(page.nextOffset);
+        if (!Number.isSafeInteger(nextOffset) || nextOffset <= offset) throw new Error('Invalid report-card pagination');
+        offset = nextOffset;
+      }
+      return TestEngine.mergeResults(allRemote);
     } catch (error) {
       console.warn('Result sync unavailable:', error.message);
       return TestEngine.getResults();
@@ -275,8 +286,11 @@
       const value = item.valueFrom === 'questionCount' ? `${questionCount}${item.suffix || ''}` : item.value;
       return `<div><strong>${value}</strong><span>${item.label}</span></div>`;
     }).join('');
-    const diagnosticHeroLabel = 'Take Free Diagnostic →';
-    const diagnosticHeroRoute = '#/diagnostic';
+    const savedDiagnostic = Boolean(state.user) && TestEngine.getResults().some(result =>
+      result.type === 'diagnostic' && result.examId === state.preferences.primary
+    );
+    const diagnosticHeroLabel = savedDiagnostic ? 'View All Report Cards →' : 'Take Free Diagnostic →';
+    const diagnosticHeroRoute = savedDiagnostic ? '#/results' : '#/diagnostic';
     document.getElementById('app').innerHTML = `
       <div class="public-landing">
         <section class="landing-section"><article class="landing-final-cta"><div><h2>${content.finalCta.title}</h2><p>${content.finalCta.description}</p></div><a class="mint-button" href="${content.finalCta.route}">${content.finalCta.label} →</a></article></section>
@@ -286,7 +300,7 @@
             <span class="landing-badge">◆ ${content.badge}</span>
             <h1>${content.titleBefore}<br><em>${content.titleHighlight}</em></h1>
             <p>${content.description}</p>
-            <div class="landing-actions"><a class="mint-button" href="${diagnosticHeroRoute}">${diagnosticHeroLabel}</a><a class="dark-button" href="#/landing-exams">Explore Exams & Practice →</a></div>
+            <div class="landing-actions"><a class="mint-button" href="${diagnosticHeroRoute}">${diagnosticHeroLabel}</a>${savedDiagnostic ? '<a class="dark-button" href="#/diagnostic">Retake Diagnostic →</a>' : ''}<a class="dark-button" href="#/landing-exams">Explore Exams & Practice →</a></div>
             ${guestNotice()}
             <div class="capability-grid">${capabilities}</div>
           </div>
@@ -539,7 +553,7 @@
           <div class="progress-ring" style="--progress:${average}"><span><strong>${average}%</strong><small>average</small></span></div>
           <a class="primary-button" href="${practiceRouteForPrimary}">Open exam practice →</a>
         </article>
-        <a class="diagnostic-banner" href="#/diagnostic"><strong>${completedDiagnostic ? 'Retake Free Diagnostic' : 'Take Free Diagnostic Test'}</strong><span>${completedDiagnostic ? 'Start a fresh diagnostic attempt and receive a new report →' : 'Select one exam and get a subject-wise report with preparation priorities →'}</span></a>
+        <div class="diagnostic-entry-actions"><a class="diagnostic-banner" href="${completedDiagnostic ? '#/results' : '#/diagnostic'}"><strong>${completedDiagnostic ? 'View All Report Cards' : 'Take Free Diagnostic Test'}</strong><span>${completedDiagnostic ? 'Browse every saved attempt, score and answer review →' : 'Start a diagnostic for your selected exam and get a subject-wise report →'}</span></a>${completedDiagnostic ? '<a class="ghost-button" href="#/diagnostic">Retake diagnostic →</a>' : ''}</div>
         ${active ? `<article class="resume-banner"><div><span class="eyebrow">SAVED ATTEMPT</span><h3>${state.tests.find(test => test.id === active.testId)?.title || 'Your test'}</h3><p>Question ${active.current + 1} · Your answers are safely stored.</p></div><a class="primary-button" href="#/attempt/${active.testId}">Resume test</a></article>` : ''}
         <div class="metrics-grid">
           <article><span class="metric-icon blue">${icon('test')}</span><strong>${attempts}</strong><small>Tests attempted</small></article>
@@ -1005,7 +1019,7 @@
       <section class="diagnostic-report-section"><h2>Topic-wise performance</h2>${report.topics.map(row => diagnosticBreakdown(row, `${report.subjects.find(subject => subject.id === row.subjectId)?.label || row.subjectId} · ${row.label}${row.total < 3 ? ' · needs more assessment' : ''}`)).join('')}</section>
       <section class="diagnostic-report-section"><h2>Areas of strength</h2><p>${report.strengths.length ? report.strengths.map(row => `${escapeHtml(row.label)} (${row.correct}/${row.total})`).join(' · ') : 'No topic has enough questions and a strong result to confirm a strength yet.'}</p></section>
       <section class="diagnostic-report-section"><h2>Focus areas</h2>${focus || '<p>No weakness can be established from this sample. Review unanswered questions and take more topic practice to gather evidence.</p>'}<p>${report.needsAssessment.length} topics have fewer than three questions and need more assessment before being labelled strengths or weaknesses.</p></section>
-      ${!state.user ? guestNotice() : ""}<div class="result-actions"><a class="primary-button" href="#/review/${result.id}">Review answers →</a><a class="ghost-button" href="${state.user ? '#/constable' : '#/landing-exams'}">View syllabus</a><a class="ghost-button" href="${state.user ? '#/tests' : '#/register'}">${state.user ? "Practise topics" : "Register for practice tests"}</a><a class="ghost-button" href="#/instructions/${test.id}">Retake free diagnostic →</a></div></section>`;
+      ${!state.user ? guestNotice() : ""}<div class="result-actions"><a class="primary-button" href="#/review/${result.id}">Review answers →</a><a class="ghost-button" href="${state.user ? '#/constable' : '#/landing-exams'}">View syllabus</a><a class="ghost-button" href="${state.user ? '#/tests' : '#/register'}">${state.user ? "Practise topics" : "Register for practice tests"}</a><a class="ghost-button" href="#/results">All report cards →</a><a class="ghost-button" href="${test.available ? '#/instructions/'+encodeURIComponent(test.id) : '#/diagnostic'}">Retake diagnostic →</a></div></section>`;
   }
 
   function renderInstructions(id) {
@@ -1087,14 +1101,35 @@
   }
 
   function renderResults() {
-    const results = TestEngine.getResults();
+    const results = [...TestEngine.getResults()].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+    const diagnosticCount = results.filter(result => result.type === 'diagnostic').length;
     document.getElementById('app').innerHTML = `
       <section class="page">
-        <div class="page-hero compact"><span class="eyebrow">PERFORMANCE HISTORY</span><h1>Your test results</h1><p>Use every result to decide what to practise next.</p></div>
-        ${results.length ? `<div class="result-list">${results.map(result => `
-          <a href="#/result/${result.id}" class="result-row"><span class="score-orb ${result.passed ? 'pass' : 'fail'}">${result.percent}%</span><span><strong>${result.title}</strong><small>${formatDate(result.date)} · ${result.correct} correct · ${TestEngine.formatTime(result.timeSeconds)}</small></span><b>${result.passed ? 'Passed' : 'Needs work'} →</b></a>`).join('')}</div>`
-        : '<div class="empty-state"><div class="empty-icon">◎</div><h2>No results yet</h2><p>Complete your first practice test to see performance insights.</p><a class="primary-button" href="#/tests">Browse tests</a></div>'}
+        <div class="page-hero compact"><span class="eyebrow">PERMANENT STUDENT HISTORY</span><h1>All Report Cards</h1><p>${results.length} saved report card${results.length === 1 ? '' : 's'}, including ${diagnosticCount} diagnostic attempt${diagnosticCount === 1 ? '' : 's'}. Each attempt is kept separately with its original score and answer review.</p>
+        <div class="result-actions"><a class="primary-button" href="#/diagnostic">Take another diagnostic →</a><a class="ghost-button" href="#/home">Back to dashboard</a></div></div>
+        ${results.length ? `<div class="result-list">${results.map((result, index) => `
+          <a href="#/result/${encodeURIComponent(result.id)}" class="result-row"><span class="score-orb ${result.passed ? 'pass' : 'fail'}">${result.percent}%</span><span><strong>${escapeHtml(result.title || 'Test report')}</strong><small>${result.type === 'diagnostic' ? 'Diagnostic' : 'Practice / mock'} · ${escapeHtml(String(result.date || '').slice(0, 10))} · ${result.correct} correct · ${TestEngine.formatTime(result.timeSeconds)} · Attempt ${results.length - index}</small></span><b>View Report Card →</b></a>`).join('')}</div>`
+        : '<div class="empty-state"><div class="empty-icon">◎</div><h2>No report cards yet</h2><p>Complete a diagnostic or practice test to begin your saved history.</p><a class="primary-button" href="#/diagnostic">Take a diagnostic</a></div>'}
       </section>`;
+  }
+  function resultTest(result) {
+    const published = findTest(result?.testId) || findTest(result?.baseTestId);
+    if (published) return published;
+    if (!result || !Array.isArray(result.questions) || !result.questions.length) return null;
+    // Historical report cards still open even when the original paper is
+    // unpublished, replaced or removed from today's question bank.
+    return {
+      id: result.testId,
+      title: result.title || 'Archived test',
+      type: result.type || 'practice',
+      examId: result.examId,
+      examIds: result.examId ? [result.examId] : [],
+      questions: result.questions,
+      marking: result.marking || { correct: 1, incorrect: 0, unanswered: 0 },
+      totalMarks: result.totalMarks,
+      timing: { totalSeconds: Math.max(60, Number(result.timeSeconds) || 60) },
+      available: false
+    };
   }
 
   function renderExpiredGuestReport() {
@@ -1103,7 +1138,7 @@
 
   function renderResult(id) {
     const result = TestEngine.temporaryGuestResult(id) || TestEngine.getResults().find(item => item.id === id);
-    const test = findTest(result?.testId) || findTest(result?.baseTestId);
+    const test = resultTest(result);
     if (!result || !test) return !state.user ? renderExpiredGuestReport() : notFound('Result not found');
     if (result.type === 'diagnostic') return renderDiagnosticResult(result, test);
     const circumference = 339.3;
@@ -1160,7 +1195,7 @@
 
   function renderReview(id) {
     const result = TestEngine.temporaryGuestResult(id) || TestEngine.getResults().find(item => item.id === id);
-    const test = findTest(result?.testId) || findTest(result?.baseTestId);
+    const test = resultTest(result);
     if (!result || !test) return !state.user ? renderExpiredGuestReport() : notFound('Review not found');
     document.getElementById('app').innerHTML = `
       <section class="page narrow">
