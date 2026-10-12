@@ -18,9 +18,18 @@
   };
 
   function guestNotice() {
-    if (state.user) return '<div class="guest-access-note"><strong>Unlimited free diagnostics.</strong> Signed-in tests can be saved to your account.</div>';
-    return '<div class="guest-access-note"><strong>Unlimited free diagnostic tests and full reports — no login required.</strong> Your report and answer review are shown only for this attempt. Nothing is saved; leaving the report or refreshing the page discards it. You can take another test whenever you wish.</div>';
+    if (state.user) return '<div class="guest-access-note"><strong>Exam-specific diagnostic.</strong> The questions follow your selected examination. Each fresh attempt reshuffles questions and MCQ choices; signed-in results are saved for progress tracking.</div>';
+    return '<div class="guest-access-note"><strong>Free general reasoning diagnostic — unlimited attempts, no login.</strong> View your full report and answers immediately. Guest attempts and results are never saved; leaving or refreshing discards them.</div>';
   }
+
+  function canTakeDiagnostic(test) {
+    if (!test || !test.available || test.type !== 'diagnostic') return false;
+    if (!state.user) return test.audience === 'guest';
+    return test.audience !== 'guest' && Boolean(state.preferences.primary) &&
+      test.examIds?.includes(state.preferences.primary) &&
+      state.exams.some(exam => exam.id === state.preferences.primary && exam.available);
+  }
+
 
   function read(key) {
     try { return JSON.parse(localStorage.getItem(key)); } catch (_) { return null; }
@@ -177,7 +186,7 @@
     closeModal();
     const { name, id } = currentRoute();
     const publicRoutes = ['landing', 'landing-exams', 'landing-how', 'login', 'register', 'diagnostic', 'result', 'review', 'admin'];
-    const publicDiagnostic = (['instructions', 'attempt'].includes(name) && state.tests.some(test => test.id === id && test.type === 'diagnostic')) || (['result', 'review'].includes(name) && Boolean(TestEngine.temporaryGuestResult(id)));
+    const publicDiagnostic = (['instructions', 'attempt'].includes(name) && state.tests.some(test => test.id === id && canTakeDiagnostic(test))) || (['result', 'review'].includes(name) && Boolean(TestEngine.temporaryGuestResult(id)));
     // Guest results exist only while the report or answer review is being viewed.
     if (!(['result', 'review'].includes(name) && TestEngine.temporaryGuestResult(id))) TestEngine.clearTemporaryGuestResult();
     if (!state.user && !publicRoutes.includes(name) && !publicDiagnostic) {
@@ -343,7 +352,7 @@
             <button class="primary-button full" type="submit">Sign in securely →</button>
           </form>
           <div class="google-auth" id="googleLogin" hidden></div>
-          <p class="auth-switch">Free diagnostic retakes never require login. Sign in for practice features and account-based progress tracking. <a href="#/register">Create a free account</a> if you are new.</p>
+          <p class="auth-switch">Guests can take the general reasoning diagnostic without login. Sign in for diagnostics tailored to your selected examination and saved progress. <a href="#/register">Create a free account</a> if you are new.</p>
           <div class="trust-row"><span>✓ Student-first design</span><span>✓ Progress saved</span></div>
         </article>
       </section>`;
@@ -377,7 +386,7 @@
         <label>Confirm password<input name="password_confirmation" type="password" autocomplete="new-password" minlength="8" required></label>
         <p class="form-error" id="registerError" role="alert"></p>
         <button class="primary-button full" type="submit">Register →</button>
-      </form><div class="google-auth" id="googleRegister" hidden></div><p class="auth-switch">Unlimited free diagnostic tests and full reports need no account. Register for practice features and saved progress across devices. Already registered? <a href="#/login">Sign in</a></p>
+      </form><div class="google-auth" id="googleRegister" hidden></div><p class="auth-switch">General reasoning is free for guests with unlimited attempts and no saved results. Register to take exam-specific diagnostics and save results across devices. Already registered? <a href="#/login">Sign in</a></p>
     </article></section>`;
     document.getElementById('registerForm').addEventListener('submit', async event => {
       event.preventDefault();
@@ -876,6 +885,7 @@
     const completed = new Set(TestEngine.getResults().map(result => result.testId));
     const query = state.filters.query.toLowerCase();
     return state.tests.filter(test => {
+      if (test.audience === 'guest') return false;
       const matchesText = !query || `${test.title} ${test.description} ${test.category}`.toLowerCase().includes(query);
       const matchesExam = state.filters.exam === 'all' || test.examIds.includes(state.filters.exam);
       const matchesStatus = state.filters.status === 'all' || (state.filters.status === 'completed' ? completed.has(test.id) : !completed.has(test.id));
@@ -885,25 +895,31 @@
   function refreshTestList() { document.getElementById('testList').innerHTML = filteredTests().map(test => testCard(test)).join('') || '<div class="empty-state"><h3>No tests found</h3><p>Try changing the filters.</p></div>'; }
 
   function renderDiagnosticSelection() {
+    const isGuest = !state.user;
+    const selectedExam = state.exams.find(exam => exam.id === state.preferences.primary && exam.available);
+    const diagnostic = state.tests.find(test => canTakeDiagnostic(test));
+    const guestContent = diagnostic
+      ? `<article class="diagnostic-exam"><span class="exam-icon">${icon('chart')}</span><div><h2>General Reasoning</h2><p>Number and letter series, analogies, direction sense, coding and logical reasoning</p><p>${diagnostic.questions.length} questions · ${Math.round(diagnostic.timing.totalSeconds / 60)} minutes · Unlimited attempts · No saved results</p></div><a class="primary-button" href="#/instructions/${encodeURIComponent(diagnostic.id)}">Start reasoning test →</a></article>`
+      : '<article class="diagnostic-exam"><div><h2>General Reasoning</h2><p>The guest reasoning diagnostic is not published yet. Please check back later.</p></div></article>';
+    const studentContent = !selectedExam
+      ? '<article class="diagnostic-exam"><div><h2>Select your examination first</h2><p>Choose a primary examination so your diagnostic matches the exam you are preparing for.</p></div><a class="primary-button" href="#/onboarding">Choose examination →</a></article>'
+      : diagnostic
+        ? `<article class="diagnostic-exam"><span class="exam-icon">${icon(selectedExam.icon)}</span><div><h2>${escapeHtml(selectedExam.name)}</h2><p>${escapeHtml(diagnostic.description)}</p><p>${diagnostic.questions.length} questions · ${Math.round(diagnostic.timing.totalSeconds / 60)} minutes · New question and MCQ order each attempt</p></div><a class="primary-button" href="#/instructions/${encodeURIComponent(diagnostic.id)}">Start exam diagnostic →</a></article>`
+        : `<article class="diagnostic-exam"><span class="exam-icon">${icon(selectedExam.icon)}</span><div><h2>${escapeHtml(selectedExam.name)}</h2><p>No diagnostic is currently published for your selected exam. Publication is controlled by the administrator.</p></div><a class="ghost-button" href="#/onboarding">Change exam →</a></article>`;
     document.getElementById('app').innerHTML = `<section class="page diagnostic-page">
-      <div class="page-hero"><span class="eyebrow">UNLIMITED FREE DIAGNOSTICS</span><h1>Choose one examination</h1><p>Take a diagnostic as often as you wish, without login. See the full report and answer review after each attempt; guest results are not saved.</p></div>
+      <div class="page-hero"><span class="eyebrow">${isGuest ? 'FREE GUEST DIAGNOSTIC' : 'YOUR EXAM DIAGNOSTIC'}</span><h1>${isGuest ? 'General Reasoning Test' : selectedExam ? escapeHtml(selectedExam.name) + ' Diagnostic' : 'Select Your Exam'}</h1><p>${isGuest ? 'Test your general reasoning ability without registration. Retake as often as you wish and view the report immediately; nothing is stored.' : 'Your test follows your selected examination. On each new attempt, question order and MCQ options are randomized, and reports are saved to your account.'}</p></div>
       ${guestNotice()}
-      <div class="diagnostic-exams">${state.exams.map(exam => {
-        const paper = state.tests.find(test => test.type === 'diagnostic' && test.examId === exam.id && test.available);
-        const action = paper
-          ? `<a class="primary-button" href="#/instructions/${encodeURIComponent(paper.id)}">Take free diagnostic →</a>`
-          : '<span class="coming-soon-action">Coming soon</span>';
-        return `<article class="diagnostic-exam"><span class="exam-icon">${icon(exam.icon)}</span><div><h2>${escapeHtml(exam.name)}</h2><p>${escapeHtml(exam.authority)}</p>${paper ? `<p>${paper.questions.length} questions · ${Math.round(paper.timing.totalSeconds / 60)} minutes · Unlimited free retakes · No results saved</p>` : '<p>Diagnostic paper in preparation</p>'}</div>${action}</article>`;
-      }).join('')}</div></section>`;
+      <div class="diagnostic-exams">${isGuest ? guestContent : studentContent}</div></section>`;
   }
 
   function renderDiagnosticInstructions(test) {
+    if (!canTakeDiagnostic(test)) return renderDiagnosticSelection();
     document.getElementById('app').innerHTML = `<section class="page narrow diagnostic-page"><a class="back-link" href="#/diagnostic">← Choose exam</a>
       ${guestNotice()}<article class="instruction-card"><span class="eyebrow">FREE DIAGNOSTIC TEST</span><h1>${escapeHtml(test.title)}</h1><p>${escapeHtml(test.description)}</p>
       <p class="diagnostic-note">This ${test.questions.length}-question diagnostic assesses preparation across the available subjects. The timer, answer feedback and marking rules are fixed for this test.</p>
       <div class="instruction-stats"><div><strong>${test.questions.length}</strong><span>Questions</span></div><div><strong>${test.totalMarks}</strong><span>Maximum marks</span></div><div><strong>${Math.round(test.timing.totalSeconds / 60)} min</strong><span>Duration</span></div><div><strong>+${test.marking.correct} / ${test.marking.incorrect} / ${test.marking.unanswered}</strong><span>Correct / wrong / blank</span></div></div>
       <div class="rules-box"><h3>Assessment rules</h3><ul><li>One whole-paper timer; the paper submits when time ends.</li><li>Answers and explanations are shown after submission.</li><li>${state.user ? 'Your progress saves in this browser, including on a page reload.' : 'For guests, answers and results are not saved. Refreshing or leaving the test discards progress.'}</li></ul></div>
-      <label class="consent"><input type="checkbox" id="rulesAccepted"> I have read the instructions. I can take this free diagnostic again and view a complete report without logging in.</label><button class="primary-button full large" id="startDiagnostic" disabled>Start free diagnostic →</button></article></section>`;
+      <label class="consent"><input type="checkbox" id="rulesAccepted"> I have read the instructions. I understand that guest reasoning tests are not saved; when signed in, my selected-exam diagnostics are saved and randomized on new attempts.</label><button class="primary-button full large" id="startDiagnostic" disabled>Start free diagnostic →</button></article></section>`;
     const button = document.getElementById('startDiagnostic');
     document.getElementById('rulesAccepted').onchange = event => { button.disabled = !event.target.checked; };
     button.onclick = () => {
@@ -1007,9 +1023,10 @@
   function beginAttempt(id) {
     const test = findTest(id);
     if (!test || !test.available) return notFound('This test is not available');
+    if (test.type === 'diagnostic' && !canTakeDiagnostic(test)) return renderDiagnosticSelection();
     const saved = TestEngine.activeAttempt();
     const settings = readSession('he_test_settings') || {};
-    TestEngine.start(test, { ...settings, sound: state.sound }, saved?.testId === id ? saved : null);
+    if (TestEngine.start(test, { ...settings, sound: state.sound }, saved?.testId === id ? saved : null) === false) renderDiagnosticSelection();
   }
 
   function renderResults() {
@@ -1143,7 +1160,7 @@
           <details><summary>2. Review the syllabus</summary><p>Open the exam page and use the Syllabus section to understand the subjects and topics you need to prepare.</p></details>
           <details><summary>3. Review previous papers</summary><p>Use the Previous papers section to understand the examination style, year and shift information available for your exam.</p></details>
           <details><summary>4. Practise by subject and topic</summary><p>Use focused practice to strengthen individual areas before attempting longer tests.</p></details>
-          <details><summary>5. Take mock and diagnostic tests</summary><p>Retake the free diagnostic as many times as you wish, without logging in, and view a full report after every attempt. Sign in for other practice tests. Some tests use a whole-test timer, while others may use per-question timing or untimed practice.</p></details>
+          <details><summary>5. Take mock and diagnostic tests</summary><p>Guests can retake the general reasoning test freely, with a display-only report. Signed-in students take their selected-exam diagnostic with reshuffled questions and MCQ options on each new attempt; results are saved. Some tests use a whole-test timer, while others may use per-question timing or untimed practice.</p></details>
           <details><summary>6. Check your results</summary><p>Review your score, accuracy, unanswered questions and topic performance after completing a test.</p></details>
           <details><summary>7. Retake weak areas</summary><p>Where available, retake wrong questions, unanswered questions, or the complete test with fresh question and option shuffling.</p></details>
           <details><summary>8. Are my active attempts saved?</summary><p>Signed-in attempts and results are saved for your account. Without login, your free diagnostic, answers and report are never stored: view the report or review immediately because it disappears when you leave or reload.</p></details>
