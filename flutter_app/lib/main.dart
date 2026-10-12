@@ -1063,30 +1063,54 @@ class _TestsPage extends State<TestsPage>{
 }
 
 class DiagnosticPage extends StatelessWidget{
-  final Data d;final VoidCallback reload;final bool sound;
-  const DiagnosticPage({super.key,required this.d,required this.reload,this.sound=true});
-  @override Widget build(BuildContext c)=>ListView(
-    padding:const EdgeInsets.all(18),
-    children:[
-      const Text('Free Diagnostic Test',style:TextStyle(fontSize:28,fontWeight:FontWeight.w900)),
-      const Text('Choose one examination. The report will show subject scores and preparation priorities.',style:TextStyle(color:muted)),
-      const SizedBox(height:16),
-      ...d.exams.map((exam){
-        final matches=d.tests.where((t)=>t['type']=='diagnostic'&&t['examId']==exam['id']&&t['available']==true).toList();
-        final paper=matches.isEmpty?null:matches.first;
-        return Box(child:Row(children:[
-          CircleAvatar(backgroundColor:const Color(0xffe8f5ef),child:Icon(paper==null?Icons.schedule:Icons.health_and_safety_outlined,color:blue)),
-          const SizedBox(width:12),
-          Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-            Text('${exam['name']}',style:const TextStyle(fontWeight:FontWeight.w900)),
-            Text('${exam['authority']}',style:const TextStyle(color:muted)),
-            Text(paper==null?'Coming soon':'${(paper['questions']as List).length} questions · ${((paper['timing']['totalSeconds']as num)/60).round()} minutes'),
-          ])),
-          if(paper!=null)FilledButton(onPressed:()=>instructions(c,paper,reload,sound:sound),child:const Text('Select')),
-        ]));
-      }),
-    ],
-  );
+  final Data d;
+  final VoidCallback reload;
+  final bool sound,guest;
+  final String? selectedExam;
+  const DiagnosticPage({super.key,required this.d,required this.reload,this.sound=true,this.guest=false,this.selectedExam});
+  @override Widget build(BuildContext c){
+    final chosen=d.exams.where((e)=>e['id']==selectedExam&&e['available']==true).toList();
+    final exam=chosen.isEmpty?null:chosen.first;
+    final available=d.tests.where((t)=>
+      t['available']==true && t['type']=='diagnostic' &&
+      (guest ? t['audience']=='guest' :
+        t['audience']!='guest' && exam!=null &&
+        List<dynamic>.from(t['examIds']??[t['examId']]).contains(selectedExam))
+    ).toList();
+    final paper=available.isEmpty?null:available.first;
+    final content=ListView(
+      padding:const EdgeInsets.all(18),
+      children:[
+        Pill(guest?'FREE GUEST ASSESSMENT':'SELECTED EXAM DIAGNOSTIC'),
+        const SizedBox(height:10),
+        Text(guest?'General Reasoning Test':'${exam?['name']??'Select an exam'} Diagnostic',
+          style:const TextStyle(fontSize:28,fontWeight:FontWeight.w900)),
+        const SizedBox(height:8),
+        Text(guest
+          ? 'Unlimited general reasoning attempts with full immediate reports. No login required. Guest progress, answers and results are not stored.'
+          : 'This diagnostic follows your selected exam. Every fresh attempt reshuffles questions and MCQ choices; all completed reports are saved to your account.',
+          style:const TextStyle(color:muted)),
+        const SizedBox(height:18),
+        if(paper==null)Box(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+          const Text('Not available yet',style:TextStyle(fontWeight:FontWeight.w900,fontSize:19)),
+          const SizedBox(height:8),
+          Text(guest?'The administrator has not published a guest reasoning test.':'No diagnostic is published for the selected exam. Availability is controlled by the administrator.'),
+        ]))
+        else Box(color:const Color(0xffe8f5ef),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+          Text('${paper['title']}',style:const TextStyle(fontWeight:FontWeight.w900,fontSize:19)),
+          const SizedBox(height:7),
+          Text('${paper['description']}'),
+          const SizedBox(height:8),
+          Text('${(paper['questions'] as List).length} questions · ${(NumberTools.intValue(paper['timing']['totalSeconds'])/60).round()} minutes'),
+          const SizedBox(height:12),
+          FilledButton(onPressed:()=>instructions(c,paper,reload,sound:sound,guest:guest),child:Text(guest?'Start free reasoning test →':'Start exam diagnostic →')),
+        ])),
+        if(!guest)const Box(child:Text('Every previous report remains available under Results. Another attempt creates a separate report card.')),
+        const DeveloperCredit(),
+      ],
+    );
+    return guest ? Scaffold(appBar:AppBar(title:const Text('Guest reasoning test')),body:content) : content;
+  }
 }
 
 class DeveloperCredit extends StatelessWidget{
@@ -1159,12 +1183,32 @@ class MorePage extends StatelessWidget{
   ]);
 }
 
-void instructions(BuildContext c,Map<String,dynamic>t,VoidCallback done,{bool sound=true})=>
-  Navigator.push(c,MaterialPageRoute(builder:(_)=>Instructions(t:t,done:done,sound:sound)));
+void instructions(BuildContext c,Map<String,dynamic>t,VoidCallback done,{bool sound=true,bool guest=false})=>
+  Navigator.push(c,MaterialPageRoute(builder:(_)=>Instructions(t:t,done:done,sound:sound,guest:guest)));
+
+Map<String,dynamic> randomizeDiagnostic(Map<String,dynamic> paper){
+  final random=Random();
+  final copy=Map<String,dynamic>.from(jsonDecode(jsonEncode(paper)));
+  final original=List<Map<String,dynamic>>.from(copy['questions']);
+  final questions=original.map((entry){
+    final q=Map<String,dynamic>.from(entry);
+    final opts=List<dynamic>.from(q['options']);
+    final correct=NumberTools.intValue(q['correctOption']);
+    final pairs=List.generate(opts.length,(i)=>{'value':opts[i],'index':i})..shuffle(random);
+    q['options']=pairs.map((row)=>row['value']).toList();
+    q['correctOption']=pairs.indexWhere((row)=>row['index']==correct);
+    return q;
+  }).toList()..shuffle(random);
+  if(questions.length>1&&List.generate(questions.length,(i)=>questions[i]['id']==original[i]['id']).every((equal)=>equal)){
+    final first=questions[0];questions[0]=questions[1];questions[1]=first;
+  }
+  copy['questions']=questions;
+  return copy;
+}
 
 class Instructions extends StatefulWidget{
-  final Map<String,dynamic>t;final VoidCallback done;final bool sound;
-  const Instructions({super.key,required this.t,required this.done,this.sound=true});
+  final Map<String,dynamic>t;final VoidCallback done;final bool sound,guest;
+  const Instructions({super.key,required this.t,required this.done,this.sound=true,this.guest=false});
   @override State<Instructions>createState()=>_Instructions();
 }
 class _Instructions extends State<Instructions>{
@@ -1184,7 +1228,8 @@ class _Instructions extends State<Instructions>{
   void start(){
     if(!accepted)return;
     final diagnostic=widget.t['type']=='diagnostic';
-    final copy=Map<String,dynamic>.from(jsonDecode(jsonEncode(widget.t)));
+    final copy=diagnostic&&!widget.guest?randomizeDiagnostic(widget.t)
+      :Map<String,dynamic>.from(jsonDecode(jsonEncode(widget.t)));
     Map<String,dynamic> marking=Map<String,dynamic>.from(widget.t['marking']??{
       'correct':null,'incorrect':-NumberTools.numValue(widget.t['negativeMarking']),'unanswered':0
     });
@@ -1208,6 +1253,7 @@ class _Instructions extends State<Instructions>{
       feedback:diagnostic?'on-completion':feedback,
       done:widget.done,
       sound:widget.sound,
+      guest:widget.guest,
     )));
   }
   @override Widget build(BuildContext c){
@@ -1232,7 +1278,7 @@ class _Instructions extends State<Instructions>{
           const Box(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
             Text('• One whole-paper timer; submission is automatic when time ends.'),
             Text('• Answers and explanations appear after submission.'),
-            Text('• Progress is saved automatically and can be resumed.'),
+            Text(widget.guest?'• Guest answers and results are not saved.':'• Your progress is saved and can be resumed.'),
             Text('• Diagnostic timer, feedback and marking rules are fixed.'),
           ])),
         ]else...[
