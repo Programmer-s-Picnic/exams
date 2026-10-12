@@ -4,51 +4,19 @@
   let timerId = null;
   let resultHandler = null;
   let currentUserId = null;
-  const LEGACY_CLAIM_KEY = 'he_guest_diagnostic_claimed_by_v1';
-  const GUEST_CLAIMS_KEY = 'he_guest_diagnostic_claims_v2';
-
-  function storedJson(key, fallback = null) {
-    try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch (_) { return fallback; }
+  // Guest results exist only in RAM while the report or answer review is open.
+  let transientGuestResult = null;
+  function temporaryGuestResult(id) {
+    return currentUserId === null && transientGuestResult?.id === id ? transientGuestResult : null;
   }
-  function guestDiagnosticResults() {
-    const results = storedJson('he_results_v2_guest', []);
-    return Array.isArray(results) ? results.filter(result => result?.type === 'diagnostic') : [];
-  }
-  function guestDiagnosticStatus() {
-    const saved = storedJson('he_active_attempt_v2_guest');
-    const latest = guestDiagnosticResults()[0] || null;
-    return {
-      state: saved?.type === 'diagnostic' ? 'in-progress' : latest ? 'completed' : 'available',
-      testId: saved?.type === 'diagnostic' ? saved.testId : latest?.testId || null,
-      resultId: latest?.id || null
-    };
-  }
-  function guestClaimOwnership() {
-    const claims = storedJson(GUEST_CLAIMS_KEY, {});
-    const owners = claims && typeof claims === 'object' && !Array.isArray(claims) ? { ...claims } : {};
-    // Preserve ownership of the one historical guest report imported before unlimited retakes.
-    const legacyOwner = localStorage.getItem(LEGACY_CLAIM_KEY);
-    const reports = guestDiagnosticResults();
-    if (legacyOwner && reports.length && !owners[reports[reports.length - 1].id]) {
-      owners[reports[reports.length - 1].id] = String(legacyOwner);
-    }
-    return owners;
-  }
-  function unclaimedGuestResults() {
-    const owners = guestClaimOwnership();
-    return guestDiagnosticResults().filter(result => !owners[result.id]);
-  }
-  function guestTransferAvailable() {
-    return currentUserId !== null && unclaimedGuestResults().length > 0;
-  }
-  function claimGuestDiagnostic() {
-    if (!guestTransferAvailable()) return false;
-    const pending = unclaimedGuestResults();
-    mergeResults(pending);
-    const owners = guestClaimOwnership();
-    pending.forEach(result => { owners[result.id] = String(currentUserId); });
-    localStorage.setItem(GUEST_CLAIMS_KEY, JSON.stringify(owners));
-    return true;
+  function clearTemporaryGuestResult() { transientGuestResult = null; }
+  function purgeOldGuestData() {
+    [
+      'he_active_attempt_v2_guest', 'he_results_v2_guest',
+      'he_active_attempt_v2', 'he_results_v2',
+      'he_guest_diagnostic_once_v1', 'he_guest_diagnostic_claimed_by_v1',
+      'he_guest_diagnostic_claims_v2'
+    ].forEach(key => localStorage.removeItem(key));
   }
 
   const state = {
@@ -96,7 +64,7 @@
   }
 
   function save() {
-    if (!state.test) return;
+    if (!state.test || currentUserId === null) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       testId: state.test.id,
       type: state.test.type || 'practice',
@@ -118,6 +86,7 @@
   }
 
   function activeAttempt() {
+    if (currentUserId === null) return null;
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (_) { return null; }
   }
 
@@ -268,7 +237,7 @@
     });
     document.getElementById('exitTest').addEventListener('click', () => {
       save();
-      if (confirm('Your progress is saved. Exit this test?')) location.hash = '#/home';
+      if (confirm(currentUserId === null ? 'Exit this test? Your answers will be discarded.' : 'Your progress is saved. Exit this test?')) location.hash = currentUserId === null ? '#/diagnostic' : '#/home';
     });
     document.getElementById('openPalette').addEventListener('click', () => document.querySelector('.test-sidebar').classList.add('open'));
     document.getElementById('closePalette').addEventListener('click', () => document.querySelector('.test-sidebar').classList.remove('open'));
@@ -354,20 +323,26 @@
       topicScores,
       autoSubmitted
     };
-    const results = getResults();
-    results.unshift(result);
-    localStorage.setItem(RESULT_KEY, JSON.stringify(results.slice(0, 500)));
-    localStorage.removeItem(STORAGE_KEY);
-    if (resultHandler) Promise.resolve(resultHandler(result)).catch(() => {});
+    if (currentUserId === null) {
+      transientGuestResult = result;
+    } else {
+      const results = getResults();
+      results.unshift(result);
+      localStorage.setItem(RESULT_KEY, JSON.stringify(results.slice(0, 500)));
+      localStorage.removeItem(STORAGE_KEY);
+      if (resultHandler) Promise.resolve(resultHandler(result)).catch(() => {});
+    }
     window.App.closeModal();
     tone(result.passed ? 920 : 420, 0.3);
     location.hash = `#/result/${result.id}`;
   }
 
   function getResults() {
+    if (currentUserId === null) return [];
     try { return JSON.parse(localStorage.getItem(RESULT_KEY)) || []; } catch (_) { return []; }
   }
   function mergeResults(incoming = []) {
+    if (currentUserId === null) return [];
     const map = new Map();
     [...getResults(), ...(Array.isArray(incoming) ? incoming : [])].forEach(result => {
       if (!result || !result.id) return;
@@ -388,16 +363,14 @@
   function setSound(value) { state.sound = value; }
   function setUser(id) {
     stop(); state.test = null;
+    clearTemporaryGuestResult();
     currentUserId = id == null ? null : String(id);
     const suffix = id == null ? 'guest' : String(id);
     STORAGE_KEY = `he_active_attempt_v2_${suffix}`;
     RESULT_KEY = `he_results_v2_${suffix}`;
-    if (id == null) {
-      for (const [oldKey, newKey] of [['he_active_attempt_v2', STORAGE_KEY], ['he_results_v2', RESULT_KEY]]) {
-        if (!localStorage.getItem(newKey) && localStorage.getItem(oldKey)) localStorage.setItem(newKey, localStorage.getItem(oldKey));
-      }
-    }
+    // Clear guest data saved by older releases, without touching logged-in user records.
+    purgeOldGuestData();
   }
 
-  window.TestEngine = { start, stop, activeAttempt, getResults, mergeResults, setResultHandler, formatTime, setSound, setUser, guestDiagnosticStatus, guestDiagnosticResults, guestTransferAvailable, claimGuestDiagnostic, get storageKey() { return STORAGE_KEY; } };
+  window.TestEngine = { start, stop, activeAttempt, getResults, mergeResults, setResultHandler, formatTime, setSound, setUser, temporaryGuestResult, clearTemporaryGuestResult, get storageKey() { return STORAGE_KEY; } };
 }());
