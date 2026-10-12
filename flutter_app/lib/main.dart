@@ -1142,9 +1142,9 @@ class GuidePage extends StatelessWidget{
         GuideStep(3,'Review previous papers','Open validated question sets to read every available question and option.'),
         GuideStep(4,'Practise by subject and topic','Use focused practice before attempting longer tests.'),
         GuideStep(5,'Attempt question sets and tests','Validated question sets can be attempted through the same timer, autosave, review and result system.'),
-        GuideStep(6,'Check your results','Completed results are saved to your account and synced across the website and app.'),
+        GuideStep(6,'Check all report cards','Each signed-in diagnostic and practice attempt gets a separate report and answer review, synced across the website and app.'),
         GuideStep(7,'Retake weak areas','Retake wrong, unanswered or all questions with fresh shuffling where supported.'),
-        GuideStep(8,'Resume saved attempts','Active attempts are saved automatically on this device.'),
+        GuideStep(8,'Resume or retake','Only unfinished signed-in attempts can resume. Completed diagnostics can be retaken with randomized questions and options. Guests take unlimited reasoning tests without saving data.'),
       ])),
       const DeveloperCredit(),
     ]),
@@ -1335,8 +1335,8 @@ class _Instructions extends State<Instructions>{
 }
 
 class TestPage extends StatefulWidget{
-  final Map<String,dynamic>t;final String mode,feedback;final Map<String,dynamic>?saved;final VoidCallback done;final bool sound;
-  const TestPage({super.key,required this.t,required this.mode,required this.feedback,required this.done,this.saved,this.sound=true});
+  final Map<String,dynamic>t;final String mode,feedback;final Map<String,dynamic>?saved;final VoidCallback done;final bool sound,guest;
+  const TestPage({super.key,required this.t,required this.mode,required this.feedback,required this.done,this.saved,this.sound=true,this.guest=false});
   @override State<TestPage>createState()=>_TestPage();
 }
 class _TestPage extends State<TestPage>{
@@ -1389,7 +1389,7 @@ class _TestPage extends State<TestPage>{
       save();
     }
   }
-  Future<void>save()=>Store.set('active',{
+  Future<void>save()=>widget.guest?Future<void>.value():Store.set('active',{
     'testId':widget.t['id'],'test':widget.t,'title':widget.t['title'],
     'mode':widget.mode,'feedback':widget.feedback,'current':i,
     'answers':ans,'checked':checked,'review':review,'seconds':sec,'elapsed':elapsed,'startedAt':startedAt
@@ -1440,7 +1440,7 @@ class _TestPage extends State<TestPage>{
     }
     final percent=totalMarks<=0?0:max(0,((score/totalMarks)*100).round());
     final result={
-      'id':'result-${DateTime.now().millisecondsSinceEpoch}',
+      'id':'result-${DateTime.now().millisecondsSinceEpoch}-${Random().nextInt(0x7fffffff)}',
       'title':widget.t['title'],'testId':widget.t['id'],'baseTestId':widget.t['baseTestId']??widget.t['id'],
       'type':widget.t['type']??'practice','examId':widget.t['examId']??(widget.t['examIds']as List?)?.first,
       'correct':right,'incorrect':wrongCount,'unanswered':qs.length-right-wrongCount,
@@ -1451,13 +1451,17 @@ class _TestPage extends State<TestPage>{
       'timeSeconds':max(1,((DateTime.now().millisecondsSinceEpoch-startedAt)/1000).floor()),
       'marking':marking,'markingMode':markingMode,
     };
-    final all=await Store.list('results');
-    all.insert(0,result);
-    await Store.set('results',all);
-    await saveResultToServer(result);
-    await Store.del('active');
-    widget.done();
-    if(mounted)Navigator.pushReplacement(context,MaterialPageRoute(builder:(_)=>ResultPage(t:widget.t,r:Map<String,dynamic>.from(result),done:widget.done,sound:widget.sound)));
+    if(!widget.guest){
+      final all=await Store.list('results');
+      all.insert(0,result);
+      try{await Store.set('results',all);}catch(_){/* Server sync remains available. */}
+      await saveResultToServer(result);
+      await Store.del('active');
+      widget.done();
+    }
+    if(mounted)Navigator.pushReplacement(context,MaterialPageRoute(builder:(_)=>ResultPage(
+      t:widget.t,r:Map<String,dynamic>.from(result),done:widget.done,sound:widget.sound,guest:widget.guest,
+    )));
   }
   void palette()=>showModalBottomSheet(
     context:context,
@@ -1487,7 +1491,7 @@ class _TestPage extends State<TestPage>{
       canPop:false,
       child:Scaffold(
         appBar:AppBar(
-          leading:IconButton(onPressed:()async{await save();if(c.mounted)Navigator.pop(c);},icon:const Icon(Icons.close)),
+          leading:IconButton(onPressed:()async{if(!widget.guest)await save();if(c.mounted)Navigator.pop(c);},icon:const Icon(Icons.close)),
           title:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
             Text('${widget.t['title']}',style:const TextStyle(fontSize:14,fontWeight:FontWeight.w800)),
             Text('Question ${i+1} of ${qs.length}',style:const TextStyle(fontSize:11)),
@@ -1542,8 +1546,8 @@ class _TestPage extends State<TestPage>{
 }
 
 class ResultPage extends StatelessWidget{
-  final Map<String,dynamic>t,r;final VoidCallback done;final bool sound;
-  const ResultPage({super.key,required this.t,required this.r,required this.done,this.sound=true});
+  final Map<String,dynamic>t,r;final VoidCallback done;final bool sound,guest;
+  const ResultPage({super.key,required this.t,required this.r,required this.done,this.sound=true,this.guest=false});
   List<int?>get ans=>List<int?>.from(r['answers']??[]);
   List<Map<String,dynamic>>get questions=>List<Map<String,dynamic>>.from(r['questions']??t['questions']??[]);
   List<Map<String,dynamic>>pick(String mode)=>questions.asMap().entries.where((e){
@@ -1571,7 +1575,7 @@ class ResultPage extends StatelessWidget{
   }
   void retake(BuildContext c,String mode){
     if(pick(mode).isEmpty)return;
-    instructions(c,mixed(mode),done,sound:sound);
+    instructions(c,mixed(mode),done,sound:sound,guest:guest);
   }
   @override Widget build(BuildContext c){
     final diagnostic=r['type']=='diagnostic';
@@ -1637,7 +1641,7 @@ class ResultPage extends StatelessWidget{
         ]else...[
           const TitleText('Focus areas'),
           Box(child:Text(weak==null?'Review unanswered questions and take more practice.':'Begin with $weak, then retake the diagnostic after further practice.')),
-          FilledButton(onPressed:()=>instructions(c,t,done,sound:sound),child:const Text('Retake diagnostic')),
+          FilledButton(onPressed:()=>instructions(c,t,done,sound:sound,guest:guest),child:const Text('Retake diagnostic')),
         ],
         const TitleText('Review answers'),
         ...questions.asMap().entries.map((e){
@@ -1672,8 +1676,8 @@ class ResultsPage extends StatelessWidget{
   @override Widget build(BuildContext c){
     if(items.isEmpty)return const Center(child:Padding(padding:EdgeInsets.all(24),child:Text('Complete a test to begin measuring progress.')));
     return ListView(padding:const EdgeInsets.all(18),children:[
-      const Text('Your results',style:TextStyle(fontSize:28,fontWeight:FontWeight.w900)),
-      const Text('Results are saved to your account and available on your signed-in devices.',style:TextStyle(color:muted)),
+      const Text('All Report Cards',style:TextStyle(fontSize:28,fontWeight:FontWeight.w900)),
+      Text('${items.length} saved report cards, including ${items.where((r)=>r['type']=='diagnostic').length} diagnostic attempts. Each original result and answer review is kept separately and synced to your account.',style:const TextStyle(color:muted)),
       const SizedBox(height:14),
       ...items.map((raw){
         final r=Map<String,dynamic>.from(raw);
