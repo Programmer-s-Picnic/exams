@@ -247,6 +247,7 @@
     const diagnosticHeroRoute = '#/diagnostic';
     document.getElementById('app').innerHTML = `
       <div class="public-landing">
+        <section class="landing-section"><article class="landing-final-cta"><div><h2>${content.finalCta.title}</h2><p>${content.finalCta.description}</p></div><a class="mint-button" href="${content.finalCta.route}">${content.finalCta.label} →</a></article></section>
         <section class="landing-hero">
           <div class="landing-glow one"></div><div class="landing-glow two"></div>
           <div class="landing-hero-inner">
@@ -266,7 +267,6 @@
           <div class="landing-section-head centered"><span class="landing-eyebrow">${content.how.eyebrow}</span><h2>${content.how.title}</h2></div>
           <div class="how-grid">${content.how.steps.map(step => `<article><span>${step.number}</span><h3>${step.title}</h3><p>${step.description}</p></article>`).join('')}</div>
         </section>
-        <section class="landing-section"><article class="landing-final-cta"><div><h2>${content.finalCta.title}</h2><p>${content.finalCta.description}</p></div><a class="mint-button" href="${content.finalCta.route}">${content.finalCta.label} →</a></article></section>
       </div>`;
     document.querySelectorAll('[data-public-exam]').forEach(button => button.addEventListener('click', () => {
       if (state.user && state.preferences.selected.includes(button.dataset.publicExam)) {
