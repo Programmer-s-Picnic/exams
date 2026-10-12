@@ -234,7 +234,6 @@
       const value = item.valueFrom === 'questionCount' ? `${questionCount}${item.suffix || ''}` : item.value;
       return `<div><strong>${value}</strong><span>${item.label}</span></div>`;
     }).join('');
-    const featuredTest = state.tests.find(test => test.available) || state.tests[0];
     const diagnosticHeroLabel = 'Take Free Diagnostic →';
     const diagnosticHeroRoute = '#/diagnostic';
     document.getElementById('app').innerHTML = `
@@ -253,12 +252,6 @@
         <section class="landing-section" id="landingExams">
           <div class="landing-section-head"><div><span class="landing-eyebrow">${content.exams.eyebrow}</span><h2>${content.exams.title}</h2><p>${content.exams.description}</p></div></div>
           <div class="public-exam-grid">${state.exams.map(publicExamCard).join('')}</div>
-        </section>
-        <section class="landing-section diagnostic-section">
-          <article class="diagnostic-panel">
-            <div><span class="landing-eyebrow">${content.diagnostic.eyebrow}</span><h2>${content.diagnostic.title}</h2><p>${content.diagnostic.description}</p><div class="diagnostic-facts">${content.diagnostic.facts.map(fact => `<span>✓ ${fact}</span>`).join('')}</div></div>
-            <div class="diagnostic-preview"><span class="preview-label">${featuredTest.category}</span><h3>${featuredTest.title}</h3><div><b>${featuredTest.questions.length}</b><small>Questions</small></div><div><b>${Math.round(featuredTest.timing.totalSeconds / 60)}</b><small>Minutes</small></div><a class="mint-button" href="${diagnosticHeroRoute}">Take free diagnostic + full report →</a></div>
-          </article>
         </section>
         <section class="landing-section" id="landingHow">
           <div class="landing-section-head centered"><span class="landing-eyebrow">${content.how.eyebrow}</span><h2>${content.how.title}</h2></div>
@@ -482,7 +475,18 @@
     const primary = state.exams.find(exam => exam.id === state.preferences.primary);
     const relevantTests = state.tests.filter(test => test.available && test.examIds.includes(state.preferences.primary));
     const results = TestEngine.getResults();
-    const active = TestEngine.activeAttempt();
+    const storedAttempt = TestEngine.activeAttempt();
+    // A result completed after an attempt started makes a leftover saved attempt stale.
+    // Do not confuse an earlier result with a genuinely unfinished new retake.
+    const completedSavedAttempt = storedAttempt && results.some(result => {
+      if (result.testId !== storedAttempt.testId) return false;
+      const startedAt = Number(storedAttempt.startedAt || 0);
+      const completedAt = Date.parse(result.date || '');
+      return Number.isFinite(completedAt) && (!startedAt || completedAt >= startedAt);
+    });
+    if (completedSavedAttempt) localStorage.removeItem(TestEngine.storageKey);
+    const active = completedSavedAttempt ? null : storedAttempt;
+    const completedDiagnostic = results.some(result => result.type === 'diagnostic' && result.examId === state.preferences.primary);
     const attempts = results.length;
     const average = attempts ? Math.round(results.reduce((sum, result) => sum + result.percent, 0) / attempts) : 0;
     const completedIds = new Set(results.map(result => result.testId));
@@ -495,7 +499,7 @@
           <div class="progress-ring" style="--progress:${average}"><span><strong>${average}%</strong><small>average</small></span></div>
           <a class="primary-button" href="#/constable">Open Constable exam →</a>
         </article>
-        <a class="diagnostic-banner" href="#/diagnostic"><strong>Take Free Diagnostic Test</strong><span>Select one exam and get a subject-wise report with preparation priorities →</span></a>
+        <a class="diagnostic-banner" href="#/diagnostic"><strong>${completedDiagnostic ? 'Retake Free Diagnostic' : 'Take Free Diagnostic Test'}</strong><span>${completedDiagnostic ? 'Start a fresh diagnostic attempt and receive a new report →' : 'Select one exam and get a subject-wise report with preparation priorities →'}</span></a>
         ${active ? `<article class="resume-banner"><div><span class="eyebrow">SAVED ATTEMPT</span><h3>${state.tests.find(test => test.id === active.testId)?.title || 'Your test'}</h3><p>Question ${active.current + 1} · Your answers are safely stored.</p></div><a class="primary-button" href="#/attempt/${active.testId}">Resume test</a></article>` : ''}
         <div class="metrics-grid">
           <article><span class="metric-icon blue">${icon('test')}</span><strong>${attempts}</strong><small>Tests attempted</small></article>
@@ -848,7 +852,7 @@
     return `<article class="test-card">
       <div class="test-card-icon">${icon(test.icon || 'test')}</div>
       <div class="test-card-copy"><span class="tag-row"><i>${test.difficulty}</i><i>${test.category}</i></span><h3>${test.title}</h3><p>${test.description}</p><div class="test-facts"><span><b>${test.questions.length}</b> questions</span><span><b>${Math.round(test.timing.totalSeconds / 60)}</b> minutes</span><span><b>${test.totalMarks}</b> marks</span><span><b>${test.marking?.correct == null ? 'Per question' : `+${test.marking.correct}`} / ${test.marking?.incorrect ?? -Number(test.negativeMarking || 0)}</b> correct / wrong</span></div></div>
-      <div class="test-card-action">${test.available ? `${previous ? `<span class="previous-score">${previous.percent}%<small>Latest score</small></span>` : '<span class="new-label">Not attempted</span>'}<a class="primary-button" href="#/instructions/${test.id}">${previous ? 'Try again' : 'View test'} →</a>` : '<span class="coming-soon-action">Coming soon</span>'}</div>
+      <div class="test-card-action">${test.available ? `${previous ? `<span class="previous-score">${previous.percent}%<small>Latest score</small></span>` : '<span class="new-label">Not attempted</span>'}<a class="primary-button" href="#/instructions/${test.id}">${previous ? 'Retake test' : 'View test'} →</a>` : '<span class="coming-soon-action">Coming soon</span>'}</div>
     </article>`;
   }
 
