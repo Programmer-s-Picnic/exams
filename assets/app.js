@@ -18,16 +18,16 @@
   };
 
   function guestNotice() {
-    if (state.user) return '<div class="guest-access-note">You are signed in. You can take additional diagnostic tests and save your results.</div>';
+    if (state.user) return '<div class="guest-access-note"><strong>Unlimited free diagnostic tests and complete reports.</strong> You may retake the diagnostic whenever you wish. Your account can keep your results.</div>';
     const guest = TestEngine.guestDiagnosticStatus();
-    if (guest.state === 'completed') return '<div class="guest-access-note"><strong>Your first diagnostic and report are free — no login required.</strong> You have used your guest attempt. <a href="#/result/' + encodeURIComponent(guest.resultId) + '">View your report</a>. <a href="#/register">Create a free account</a> or <a href="#/login">sign in</a> for another attempt.</div>';
-    if (guest.state === 'in-progress') return '<div class="guest-access-note"><strong>One free diagnostic and full report without login.</strong> You already started your guest test. Resume it to receive your report; registration or login is required for additional attempts.</div>';
-    if (guest.state === 'locked') return '<div class="guest-access-note"><strong>One free diagnostic and full report without login.</strong> Your guest test was already started. <a href="#/register">Register</a> or <a href="#/login">sign in</a> to attempt another.</div>';
-    return '<div class="guest-access-note"><strong>1 diagnostic test + full report FREE, no registration needed.</strong> For any additional attempt, create a free account or sign in. Your guest report is stored in this browser until you save it to an account.</div>';
+    const latest = TestEngine.guestDiagnosticResults()[0];
+    const resume = guest.state === 'in-progress' ? ' <a href="#/attempt/' + encodeURIComponent(guest.testId) + '">Resume your unfinished diagnostic</a>.' : '';
+    const previous = latest ? ' <a href="#/result/' + encodeURIComponent(latest.id) + '">View your latest report</a>.' : '';
+    return '<div class="guest-access-note"><strong>Unlimited free diagnostic tests + full reports — no login or registration required.</strong> Retake as often as you wish.' + resume + previous + ' Reports are stored in this browser. <a href="#/register">Register</a> or <a href="#/login">sign in</a> for practice features and account-based progress tracking.</div>';
   }
   function guestClaimBanner() {
     return state.user && TestEngine.guestTransferAvailable()
-      ? '<article class="guest-claim-banner"><div><strong>Save your free guest diagnostic report</strong><p>A report from this browser is available. You can choose to attach it to your signed-in account for future tracking.</p></div><button type="button" class="primary-button" data-claim-guest>Save report to my account</button></article>'
+      ? '<article class="guest-claim-banner"><div><strong>Save your guest diagnostic reports</strong><p>Transfer unclaimed reports from this browser to your signed-in account. Your existing results are preserved.</p></div><button type="button" class="primary-button" data-claim-guest>Save guest reports to my account</button></article>'
       : '';
   }
   function wireGuestClaim() {
@@ -35,15 +35,9 @@
       button.disabled = true;
       if (!TestEngine.claimGuestDiagnostic()) { button.disabled = false; return; }
       await syncResultsWithServer();
-      toast('Guest diagnostic added to your account. Your report remains available here.');
+      toast('Guest diagnostic reports added to your account.');
       route();
     }));
-  }
-  function renderGuestLimit() {
-    const guest = TestEngine.guestDiagnosticStatus();
-    const reportLink = guest.resultId ? '<a class="primary-button" href="#/result/' + encodeURIComponent(guest.resultId) + '">View my free report →</a>' : '';
-    const resumeLink = guest.state === 'in-progress' ? '<a class="primary-button" href="#/attempt/' + encodeURIComponent(guest.testId) + '">Resume my free diagnostic →</a>' : '';
-    document.getElementById('app').innerHTML = '<section class="page narrow diagnostic-page"><article class="guest-limit-card"><span class="eyebrow">GUEST ACCESS</span><h1>Your one free diagnostic attempt has been used</h1><p>One diagnostic test and its complete report are available without registration. To take another diagnostic, register or sign in. Your first report remains accessible in this browser.</p><div class="guest-limit-actions">' + reportLink + resumeLink + '<a class="primary-button" href="#/register">Create a free account →</a><a class="ghost-button" href="#/login">Already registered? Sign in</a></div></article></section>';
   }
 
   function read(key) {
@@ -259,8 +253,8 @@
     }).join('');
     const featuredTest = state.tests.find(test => test.available) || state.tests[0];
     const guest = state.user ? null : TestEngine.guestDiagnosticStatus();
-    const diagnosticHeroLabel = guest?.state === 'completed' ? 'View My Free Diagnostic Report →' : guest?.state === 'in-progress' ? 'Resume My Free Diagnostic →' : '1 Free Diagnostic + Report →';
-    const diagnosticHeroRoute = guest?.state === 'completed' ? '#/result/' + encodeURIComponent(guest.resultId) : guest?.state === 'in-progress' ? '#/attempt/' + encodeURIComponent(guest.testId) : '#/diagnostic';
+    const diagnosticHeroLabel = guest?.state === 'in-progress' ? 'Resume My Free Diagnostic →' : guest?.state === 'completed' ? 'Retake Free Diagnostic →' : 'Take Free Diagnostic →';
+    const diagnosticHeroRoute = guest?.state === 'in-progress' ? '#/attempt/' + encodeURIComponent(guest.testId) : '#/diagnostic';
     document.getElementById('app').innerHTML = `
       <div class="public-landing">
         <section class="landing-hero">
@@ -281,7 +275,7 @@
         <section class="landing-section diagnostic-section">
           <article class="diagnostic-panel">
             <div><span class="landing-eyebrow">${content.diagnostic.eyebrow}</span><h2>${content.diagnostic.title}</h2><p>${content.diagnostic.description}</p><div class="diagnostic-facts">${content.diagnostic.facts.map(fact => `<span>✓ ${fact}</span>`).join('')}</div></div>
-            <div class="diagnostic-preview"><span class="preview-label">${featuredTest.category}</span><h3>${featuredTest.title}</h3><div><b>${featuredTest.questions.length}</b><small>Questions</small></div><div><b>${Math.round(featuredTest.timing.totalSeconds / 60)}</b><small>Minutes</small></div><a class="mint-button" href="${diagnosticHeroRoute}">${guest?.state === 'completed' ? 'View your free report' : 'Take one free diagnostic + report'} →</a></div>
+            <div class="diagnostic-preview"><span class="preview-label">${featuredTest.category}</span><h3>${featuredTest.title}</h3><div><b>${featuredTest.questions.length}</b><small>Questions</small></div><div><b>${Math.round(featuredTest.timing.totalSeconds / 60)}</b><small>Minutes</small></div><a class="mint-button" href="${diagnosticHeroRoute}">${guest?.state === 'completed' ? 'Retake free diagnostic' : 'Take free diagnostic + full report'} →</a></div>
           </article>
         </section>
         <section class="landing-section" id="landingHow">
@@ -374,7 +368,7 @@
             <button class="primary-button full" type="submit">Sign in securely →</button>
           </form>
           <div class="google-auth" id="googleLogin" hidden></div>
-          <p class="auth-switch">Already used your free diagnostic? Sign in for another attempt. <a href="#/register">Create a free account</a> if you are new.</p>
+          <p class="auth-switch">Free diagnostic retakes never require login. Sign in for practice features and account-based progress tracking. <a href="#/register">Create a free account</a> if you are new.</p>
           <div class="trust-row"><span>✓ Student-first design</span><span>✓ Progress saved</span></div>
         </article>
       </section>`;
@@ -408,7 +402,7 @@
         <label>Confirm password<input name="password_confirmation" type="password" autocomplete="new-password" minlength="8" required></label>
         <p class="form-error" id="registerError" role="alert"></p>
         <button class="primary-button full" type="submit">Register →</button>
-      </form><div class="google-auth" id="googleRegister" hidden></div><p class="auth-switch">Your first guest diagnostic and report are free. Register to take additional tests and save progress. Already registered? <a href="#/login">Sign in</a></p>
+      </form><div class="google-auth" id="googleRegister" hidden></div><p class="auth-switch">Unlimited free diagnostic tests and full reports need no account. Register for practice features and saved progress across devices. Already registered? <a href="#/login">Sign in</a></p>
     </article></section>`;
     document.getElementById('registerForm').addEventListener('submit', async event => {
       event.preventDefault();
