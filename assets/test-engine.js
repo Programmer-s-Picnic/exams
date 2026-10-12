@@ -359,7 +359,15 @@
     return String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character]));
   }
 
-  function stop() { clearInterval(timerId); }
+  function stop() {
+    clearInterval(timerId);
+    if (currentUserId === null) {
+      state.test = null;
+      state.answers = [];
+      state.checked = [];
+      state.review = [];
+    }
+  }
   function setSound(value) { state.sound = value; }
   function setUser(id) {
     stop(); state.test = null;
