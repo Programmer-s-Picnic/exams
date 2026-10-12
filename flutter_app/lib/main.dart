@@ -37,6 +37,7 @@ class Api{
     Map<String,dynamic>? body,
     String? token,
     bool auth=false,
+    Map<String,String>? query,
   })async{
     final key='${auth?'auth':'data'}:$path';
     if(method=='GET'&&!refresh&&cache[key]!=null)return cache[key]!;
@@ -45,9 +46,10 @@ class Api{
     for(final url in urls){
       final client=HttpClient()..connectionTimeout=const Duration(seconds:15);
       try{
+        final requestUrl=Uri.parse(url).replace(queryParameters:query);
         final req=method=='GET'
-          ?await client.getUrl(Uri.parse(url))
-          :await client.postUrl(Uri.parse(url));
+          ?await client.getUrl(requestUrl)
+          :await client.postUrl(requestUrl);
         req.headers.set('accept','application/json');
         if(token!=null)req.headers.set('authorization','Bearer $token');
         if(body!=null){
@@ -71,8 +73,8 @@ class Api{
     if(last is ApiException)throw last;
     throw const ApiException('Content is temporarily unavailable. Please try again.');
   }
-  static Future<Map<String,dynamic>> auth(String path,{Map<String,dynamic>? body,String? token})=>
-      request(path,method:body==null?'GET':'POST',body:body,token:token,auth:true);
+  static Future<Map<String,dynamic>> auth(String path,{Map<String,dynamic>? body,String? token,Map<String,String>? query})=>
+      request(path,method:body==null?'GET':'POST',body:body,token:token,auth:true,query:query);
 }
 
 Future<Map<String,dynamic>> googleAccount()async{
@@ -120,13 +122,24 @@ Future<List<dynamic>> syncResultsWithServer(List<dynamic> local)async{
   final token=await Store.string('token');
   if(token==null)return local;
   try{
-    final upload=local.take(500).toList();
-    for(var offset=0;offset<upload.length;offset+=100){
-      await Api.auth('results',body:{'results':upload.skip(offset).take(100).toList()},token:token);
+    for(var offset=0;offset<local.length;offset+=100){
+      await Api.auth('results',body:{'results':local.skip(offset).take(100).toList()},token:token);
     }
-    final remote=await Api.auth('results',token:token);
+    final remote=<dynamic>[];
+    var offset=0;
+    const pageSize=100;
+    while(true){
+      final page=await Api.auth('results',token:token,query:{
+        'offset':'$offset','limit':'$pageSize',
+      });
+      remote.addAll(List<dynamic>.from(page['results']??[]));
+      if(page['hasMore']!=true)break;
+      final next=NumberTools.intValue(page['nextOffset']);
+      if(next<=offset)throw const ApiException('Invalid results pagination');
+      offset=next;
+    }
     final merged=<String,Map<String,dynamic>>{};
-    for(final raw in [...local,...List<dynamic>.from(remote['results']??[])]){
+    for(final raw in [...local,...remote]){
       if(raw is! Map)continue;
       final row=Map<String,dynamic>.from(raw);
       final id='${row['id']??''}';
@@ -136,7 +149,7 @@ Future<List<dynamic>> syncResultsWithServer(List<dynamic> local)async{
     }
     final rows=merged.values.toList()
       ..sort((a,b)=>'${b['date']??''}'.compareTo('${a['date']??''}'));
-    return rows.take(500).toList();
+    return rows;
   }catch(_){
     return local;
   }
@@ -275,7 +288,7 @@ class Landing extends StatelessWidget{
   const Landing({super.key,required this.d});
   @override Widget build(BuildContext c){
     final content=Map<String,dynamic>.from(d.config['content']?['landing']??{});
-    final available=d.tests.where((t)=>t['available']==true).toList();
+    final available=d.tests.where((t)=>t['available']==true&&t['audience']!='guest'&&t['type']!='diagnostic').toList();
     final count=d.tests.fold<int>(0,(a,t)=>a+((t['questions']as List?)?.length??0));
     return Scaffold(
       backgroundColor:forest,
@@ -1345,7 +1358,7 @@ class _TestPage extends State<TestPage>{
     };
     final all=await Store.list('results');
     all.insert(0,result);
-    await Store.set('results',all.take(500).toList());
+    await Store.set('results',all);
     await saveResultToServer(result);
     await Store.del('active');
     widget.done();
