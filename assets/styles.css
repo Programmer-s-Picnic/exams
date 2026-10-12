@@ -291,7 +291,7 @@ body.admin-mode .admin-shell-header {
 }
 
 
-/* One guest diagnostic + full report: clear, accessible entitlement notices. */
+/* Unlimited anonymous diagnostic retakes, report history, and account import notices. */
 .guest-access-note{
   margin:18px 0 24px;
   padding:16px 20px;
@@ -305,18 +305,6 @@ body.admin-mode .admin-shell-header {
 .guest-access-note strong{color:#b8ffe5;font-weight:850}
 .guest-access-note a{color:#9cfbd8;text-decoration:underline;text-underline-offset:3px;font-weight:750}
 .guest-access-note a:focus-visible{outline:3px solid #82f2ca;outline-offset:3px}
-.guest-limit-card{
-  max-width:740px;
-  margin:36px auto;
-  padding:clamp(24px,4vw,44px);
-  border:1px solid rgba(74,213,167,.4);
-  border-radius:24px;
-  background:rgba(19,51,42,.72);
-  color:#eafff6;
-  box-shadow:0 16px 40px rgba(0,0,0,.12);
-}
-.guest-limit-card h1{line-height:1.15;margin:14px 0 12px}
-.guest-limit-card p{color:#c5e3d6;line-height:1.7}
 .guest-limit-actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:22px 0}
 .guest-claim-banner{
   display:flex;align-items:center;justify-content:space-between;gap:20px;
