@@ -251,6 +251,9 @@ class _SessionStart extends State<SessionStart>{
   late Future<Map<String,dynamic>?> future;
   @override void initState(){super.initState();future=restore();}
   Future<Map<String,dynamic>?>restore()async{
+    Store.scope='guest';
+    await Store.del('active');
+    await Store.del('results');
     final token=await Store.string('token');
     if(token==null)return null;
     try{
@@ -1275,11 +1278,11 @@ class _Instructions extends State<Instructions>{
         ]),
         if(diagnostic)...[
           const TitleText('Assessment rules'),
-          const Box(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-            Text('• One whole-paper timer; submission is automatic when time ends.'),
-            Text('• Answers and explanations appear after submission.'),
+          Box(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+            const Text('• One whole-paper timer; submission is automatic when time ends.'),
+            const Text('• Answers and explanations appear after submission.'),
             Text(widget.guest?'• Guest answers and results are not saved.':'• Your progress is saved and can be resumed.'),
-            Text('• Diagnostic timer, feedback and marking rules are fixed.'),
+            const Text('• Diagnostic timer, feedback and marking rules are fixed.'),
           ])),
         ]else...[
           const TitleText('Timing mode'),
@@ -1599,6 +1602,8 @@ class ResultPage extends StatelessWidget{
         const SizedBox(height:16),
         Text(diagnostic?'Diagnostic report card':'Your result is ready',textAlign:TextAlign.center,style:const TextStyle(fontSize:26,fontWeight:FontWeight.w900)),
         Text('${r['title']}',textAlign:TextAlign.center,style:const TextStyle(color:muted)),
+        Text(dateOnly(r['date']),textAlign:TextAlign.center,style:const TextStyle(color:muted)),
+        if(guest)const Box(child:Text('Guest report: see your score and answer review now. Nothing has been saved. Closing this report discards it.')),
         const SizedBox(height:15),
         Row(children:[
           Expanded(child:Stat('${r['correct']}','Correct')),const SizedBox(width:8),
@@ -1641,7 +1646,8 @@ class ResultPage extends StatelessWidget{
         ]else...[
           const TitleText('Focus areas'),
           Box(child:Text(weak==null?'Review unanswered questions and take more practice.':'Begin with $weak, then retake the diagnostic after further practice.')),
-          FilledButton(onPressed:()=>instructions(c,t,done,sound:sound,guest:guest),child:const Text('Retake diagnostic')),
+          if(t['available']!=false)FilledButton(onPressed:()=>instructions(c,t,done,sound:sound,guest:guest),child:const Text('Retake diagnostic'))
+           else const Box(child:Text('This historical paper is no longer published. Its report remains available.')),
         ],
         const TitleText('Review answers'),
         ...questions.asMap().entries.map((e){
