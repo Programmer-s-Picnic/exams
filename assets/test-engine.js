@@ -63,10 +63,35 @@
       : `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   }
 
+  function shuffleCopy(items) {
+    const copy = [...items];
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  }
+  function randomizedDiagnosticQuestions(questions) {
+    return shuffleCopy(questions.map(question => {
+      const choices = shuffleCopy(question.options.map((value, index) => ({ value, index })));
+      return {
+        ...question,
+        options: choices.map(choice => choice.value),
+        correctOption: choices.findIndex(choice => choice.index === question.correctOption)
+      };
+    }));
+  }
+  function sameQuestions(a, b) {
+    return Array.isArray(a) && Array.isArray(b) && a.length === b.length &&
+      a.every((question, index) => question.id === b[index].id &&
+        question.options.every((option, pos) => option === b[index].options[pos]));
+  }
+
   function save() {
     if (!state.test || currentUserId === null) return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       testId: state.test.id,
+      questions: state.test.type === 'diagnostic' ? state.test.questions : undefined,
       type: state.test.type || 'practice',
       examId: state.test.examId || state.test.examIds?.[0] || null,
       paperVersion: state.test.paperVersion || null,
@@ -92,8 +117,27 @@
 
   function start(test, settings = {}, saved = null) {
     clearInterval(timerId);
-    state.test = test;
     const diagnostic = test.type === 'diagnostic';
+    if (diagnostic && (currentUserId === null ? test.audience !== 'guest' : test.audience === 'guest')) return false;
+    let preparedQuestions = test.questions;
+    if (diagnostic && currentUserId !== null) {
+      if (saved?.testId === test.id && Array.isArray(saved.questions) && saved.questions.length === test.questions.length) {
+        preparedQuestions = saved.questions;
+      } else {
+        const previous = getResults().find(result => result.testId === test.id)?.questions;
+        preparedQuestions = randomizedDiagnosticQuestions(test.questions);
+        if (sameQuestions(preparedQuestions, previous) && preparedQuestions.length > 1) {
+          [preparedQuestions[0], preparedQuestions[1]] = [preparedQuestions[1], preparedQuestions[0]];
+        }
+        if (sameQuestions(preparedQuestions, previous) && preparedQuestions.length === 1) {
+          const entry = preparedQuestions[0];
+          const choices = [...entry.options];
+          [choices[0], choices[1]] = [choices[1], choices[0]];
+          preparedQuestions[0] = { ...entry, options: choices, correctOption: entry.correctOption === 0 ? 1 : entry.correctOption === 1 ? 0 : entry.correctOption };
+        }
+      }
+    }
+    state.test = diagnostic && currentUserId !== null ? { ...test, questions: preparedQuestions } : test;
     state.markingMode = diagnostic ? 'default' : saved?.markingMode || settings.markingMode || 'default';
     state.marking = diagnostic ? { ...test.marking } : saved?.marking || settings.marking || test.marking || { correct: null, incorrect: -Number(test.negativeMarking || 0), unanswered: 0 };
     state.mode = diagnostic ? 'total-timed' : settings.mode || test.defaultMode || 'total-timed';
