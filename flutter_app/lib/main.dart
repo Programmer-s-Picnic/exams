@@ -79,7 +79,7 @@ class Api{
 
 Future<Map<String,dynamic>> googleAccount()async{
   final service=GoogleSignIn(scopes:const['email','profile'],serverClientId:googleServerClientId);
-  await service.signOut();
+  // Avoid failing sign-in before the account chooser due to a forced sign-out.
   final account=await service.signIn();
   if(account==null)throw const ApiException('Google sign-in was cancelled.');
   final auth=await account.authentication;
@@ -91,7 +91,22 @@ Future<Map<String,dynamic>> googleAccount()async{
   await Store.set('token','${result['token']}');
   return user;
 }
-String googleError(Object e)=>e is PlatformException?'Google sign-in is unavailable right now. Please try again.':'$e';
+String googleError(Object e){
+  if(e is PlatformException){
+    final details=(e.message??'').trim();
+    final code=e.code.trim();
+    final oauthMismatch=RegExp(r'(^|[^0-9])10([^0-9]|$)').hasMatch(details)
+      || details.contains('DEVELOPER_ERROR');
+    if(oauthMismatch){
+      return 'Google Sign-In configuration needs updating (error 10). '
+        'Check the Android OAuth client package name and the installed app signing SHA-1.';
+    }
+    return 'Google Sign-In failed (${code.isEmpty?'platform_error':code})'
+      '${details.isEmpty?'':': $details'}';
+  }
+  if(e is ApiException)return e.message;
+  return 'Google Sign-In could not complete: $e';
+}
 
 class Store{
   static String scope='guest';
