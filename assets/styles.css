@@ -291,7 +291,7 @@ body.admin-mode .admin-shell-header {
 }
 
 
-/* Unlimited anonymous diagnostic retakes, report history, and account import notices. */
+/* Display-only diagnostic report privacy notice for anonymous visitors. */
 .guest-access-note{
   margin:18px 0 24px;
   padding:16px 20px;
@@ -305,14 +305,3 @@ body.admin-mode .admin-shell-header {
 .guest-access-note strong{color:#b8ffe5;font-weight:850}
 .guest-access-note a{color:#9cfbd8;text-decoration:underline;text-underline-offset:3px;font-weight:750}
 .guest-access-note a:focus-visible{outline:3px solid #82f2ca;outline-offset:3px}
-.guest-limit-actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:22px 0}
-.guest-claim-banner{
-  display:flex;align-items:center;justify-content:space-between;gap:20px;
-  padding:18px 22px;margin-bottom:20px;
-  border:1px solid rgba(74,213,167,.42);border-radius:16px;
-  background:rgba(22,75,57,.6);color:#eafff6;
-}
-.guest-claim-banner strong{font-size:1.05rem}
-.guest-claim-banner p{margin:6px 0 0;line-height:1.55;color:#bfe4d1}
-.guest-claim-banner button{flex-shrink:0}
-@media(max-width:700px){.guest-claim-banner{flex-direction:column;align-items:stretch}.guest-limit-actions>a{flex:1 1 100%;text-align:center}}
