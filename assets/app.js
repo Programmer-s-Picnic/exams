@@ -31,6 +31,37 @@
   }
 
 
+  function examPracticeRoute(examId) {
+    return '#/exam-practice/' + encodeURIComponent(examId);
+  }
+  function practiceTestsForExam(examId) {
+    return state.tests.filter(test =>
+      !test.baseTestId &&
+      test.audience !== 'guest' &&
+      test.type !== 'diagnostic' &&
+      !/diagnostic/i.test(test.title || '') &&
+      !/diagnostic/i.test(test.category || '') &&
+      Array.isArray(test.examIds) &&
+      test.examIds.includes(examId)
+    );
+  }
+  function selectExamForPractice(examId) {
+    const exam = state.exams.find(item => item.id === examId && item.available);
+    if (!exam) return;
+    if (!state.user) {
+      sessionStorage.setItem('he_preselected_exam', examId);
+      sessionStorage.setItem('he_after_login', examPracticeRoute(examId));
+      location.hash = '#/login';
+      return;
+    }
+    state.preferences = {
+      selected: [...new Set([...(state.preferences.selected || []), examId])],
+      primary: examId
+    };
+    write(KEYS.preferences, state.preferences);
+    location.hash = examPracticeRoute(examId);
+  }
+
   function read(key) {
     try { return JSON.parse(localStorage.getItem(key)); } catch (_) { return null; }
   }
@@ -209,6 +240,7 @@
       register: renderRegister,
       home: renderDashboard,
       constable: renderConstable,
+      'exam-practice': () => renderExamPractice(id),
       document: () => renderQuestionDocument(id),
       paper: () => { location.hash = '#/document/' + encodeURIComponent(id); },
       admin: () => AdminConsole.render(state, sessionStorage.getItem('he_admin_token') || ''),
@@ -268,15 +300,9 @@
           <div class="how-grid">${content.how.steps.map(step => `<article><span>${step.number}</span><h3>${step.title}</h3><p>${step.description}</p></article>`).join('')}</div>
         </section>
       </div>`;
-    document.querySelectorAll('[data-public-exam]').forEach(button => button.addEventListener('click', () => {
-      if (state.user && state.preferences.selected.includes(button.dataset.publicExam)) {
-        location.hash = '#/constable';
-        return;
-      }
-      sessionStorage.setItem('he_preselected_exam', button.dataset.publicExam);
-      sessionStorage.setItem('he_after_login', '#/onboarding');
-      location.hash = '#/login';
-    }));
+    document.querySelectorAll('[data-public-exam]').forEach(button =>
+      button.addEventListener('click', () => selectExamForPractice(button.dataset.publicExam))
+    );
     if (scrollTarget) setTimeout(() => document.getElementById(scrollTarget)?.scrollIntoView({ behavior: 'smooth' }), 20);
   }
 
@@ -315,9 +341,13 @@
     document.body.classList.remove('auth-mode');
     const preselected = sessionStorage.getItem('he_preselected_exam');
     if (preselected && state.exams.some(exam => exam.id === preselected && exam.available)) {
-      state.preferences = { selected: [preselected], primary: preselected };
-      sessionStorage.removeItem('he_preselected_exam');
+      state.preferences = {
+        selected: [...new Set([...(state.preferences.selected || []), preselected])],
+        primary: preselected
+      };
+      write(KEYS.preferences, state.preferences);
     }
+    sessionStorage.removeItem('he_preselected_exam');
     await syncResultsWithServer();
     const requested = sessionStorage.getItem('he_after_login');
     sessionStorage.removeItem('he_after_login');
@@ -397,7 +427,7 @@
       const button = form.querySelector('button[type="submit"]'); button.disabled = true;
       try {
         saveAuth(await Api.auth('register', data), true);
-        location.hash = '#/onboarding';
+        await completeSignIn();
       } catch (error) { errorNode.textContent = error.message; button.disabled = false; }
     });
     renderGoogleButton('googleRegister', response => signInWithGoogle(response.credential, 'registerError'));
@@ -435,7 +465,7 @@
 
     document.querySelectorAll('[data-exam-select]').forEach(button => button.addEventListener('click', () => {
       const id = button.dataset.examSelect;
-      if (selected.has(id) && state.preferences.primary === id) { location.hash = '#/constable'; return; }
+      if (selected.has(id) && state.preferences.primary === id) { selectExamForPractice(id); return; }
       if (selected.has(id)) selected.delete(id); else selected.add(id);
       if (!selected.has(state.preferences.primary)) state.preferences.primary = selected.values().next().value || null;
       state.preferences.selected = [...selected];
@@ -500,13 +530,14 @@
     const average = attempts ? Math.round(results.reduce((sum, result) => sum + result.percent, 0) / attempts) : 0;
     const completedIds = new Set(results.map(result => result.testId));
     const nextTest = relevantTests.find(test => !completedIds.has(test.id)) || relevantTests[0];
+    const practiceRouteForPrimary = state.preferences.primary ? examPracticeRoute(state.preferences.primary) : '#/onboarding';
     document.getElementById('app').innerHTML = `
       <section class="page dashboard">
         <div class="welcome-row"><div><span class="eyebrow">${copy.eyebrow}</span><h1>Good ${dayPart()}, ${escapeHtml(state.user.name.split(' ')[0])}</h1><p>${copy.description}</p></div><a class="ghost-button" href="#/onboarding">Change goal</a></div>
         <article class="focus-card" id="primaryExamCard" role="link" tabindex="0" aria-label="Open UP Police Constable exam">
           <div class="focus-copy"><span class="live-pill">● PRIMARY GOAL</span><h2>${primary?.name || 'Choose an examination'}</h2><p>${primary?.description || ''}</p><div class="focus-meta"><span>Authority <b>${primary?.authority || '—'}</b></span><span>Status <b>${primary?.status || '—'}</b></span></div></div>
           <div class="progress-ring" style="--progress:${average}"><span><strong>${average}%</strong><small>average</small></span></div>
-          <a class="primary-button" href="#/constable">Open Constable exam →</a>
+          <a class="primary-button" href="${practiceRouteForPrimary}">Open exam practice →</a>
         </article>
         <a class="diagnostic-banner" href="#/diagnostic"><strong>${completedDiagnostic ? 'Retake Free Diagnostic' : 'Take Free Diagnostic Test'}</strong><span>${completedDiagnostic ? 'Start a fresh diagnostic attempt and receive a new report →' : 'Select one exam and get a subject-wise report with preparation priorities →'}</span></a>
         ${active ? `<article class="resume-banner"><div><span class="eyebrow">SAVED ATTEMPT</span><h3>${state.tests.find(test => test.id === active.testId)?.title || 'Your test'}</h3><p>Question ${active.current + 1} · Your answers are safely stored.</p></div><a class="primary-button" href="#/attempt/${active.testId}">Resume test</a></article>` : ''}
@@ -527,8 +558,8 @@
         </div>
       </section>`;
     const focusCard = document.getElementById('primaryExamCard');
-    focusCard.addEventListener('click', event => { if (!event.target.closest('a, button')) location.hash = '#/constable'; });
-    focusCard.addEventListener('keydown', event => { if (event.target === focusCard && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); location.hash = '#/constable'; } });
+    focusCard.addEventListener('click', event => { if (!event.target.closest('a, button')) location.hash = practiceRouteForPrimary; });
+    focusCard.addEventListener('keydown', event => { if (event.target === focusCard && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); location.hash = practiceRouteForPrimary; } });
   }
 
   function jsonTree(value, key = null, depth = 0) {
@@ -854,6 +885,32 @@
       document.getElementById('officialDocument').hidden = false;
       document.getElementById('officialDocument').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }));
+  }
+
+  function renderExamPractice(examId) {
+    const exam = state.exams.find(item => item.id === examId && item.available);
+    if (!exam) return notFound('This examination is not currently available');
+    const tests = practiceTestsForExam(exam.id);
+    const published = tests.filter(test => test.available);
+    const unpublished = tests.filter(test => !test.available);
+    const results = TestEngine.getResults();
+    document.getElementById('app').innerHTML = `
+      <section class="page exam-practice-page">
+        <div class="page-hero compact">
+          <span class="eyebrow">EXAM PRACTICE</span>
+          <h1>${escapeHtml(exam.name)} — Practice Sessions</h1>
+          <p>Practice tests for your chosen examination. The administrator controls which sets are available.</p>
+          <div class="result-actions">
+            <a class="ghost-button" href="#/home">← Dashboard</a>
+            ${exam.id === 'up-police' ? '<a class="ghost-button" href="#/constable">Exam overview, syllabus and papers →</a>' : ''}
+          </div>
+        </div>
+        <div class="section-heading"><div><span class="eyebrow">PUBLISHED PRACTICE</span><h2>Available sessions</h2></div></div>
+        ${published.length
+          ? `<div class="test-list">${published.map(test => testCard(test, results)).join('')}</div>`
+          : '<div class="empty-state"><h3>No practice sessions published yet</h3><p>The exam is available, but its practice tests have not yet been published by the administrator. Please check back later.</p></div>'}
+        ${unpublished.length ? `<div class="section-heading"><div><span class="eyebrow">ADMIN-CONTROLLED</span><h2>Upcoming practice sessions</h2></div></div><div class="test-list">${unpublished.map(test => testCard(test, results)).join('')}</div>` : ''}
+      </section>`;
   }
 
   function testCard(test, results = TestEngine.getResults()) {
