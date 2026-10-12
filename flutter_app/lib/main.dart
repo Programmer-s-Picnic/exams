@@ -299,7 +299,20 @@ class Landing extends StatelessWidget{
       ),
       body:ListView(children:[
         Padding(
-          padding:const EdgeInsets.fromLTRB(22,38,22,36),
+          padding:const EdgeInsets.fromLTRB(18,14,18,0),
+          child:Box(
+            color:const Color(0xff164b3b),
+            child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+              const Text('Start Preparing',style:TextStyle(color:Colors.white,fontSize:23,fontWeight:FontWeight.w900)),
+              const SizedBox(height:5),
+              const Text('Free general reasoning for guests, or sign in for exam-specific diagnostics.',style:TextStyle(color:Colors.white70)),
+              const SizedBox(height:10),
+              FilledButton(onPressed:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>DiagnosticPage(d:d,reload:(){},guest:true))),child:const Text('Start preparing →')),
+            ]),
+          ),
+        ),
+        Padding(
+          padding:const EdgeInsets.fromLTRB(22,22,22,36),
           child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
             Pill('${content['badge']??'UTTAR PRADESH EXAM PREPARATION'}',dark:true),
             const SizedBox(height:18),
@@ -316,9 +329,9 @@ class Landing extends StatelessWidget{
             ),
             const SizedBox(height:10),
             OutlinedButton(
-              onPressed:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>DiagnosticPage(d:d,reload:(){}))),
+              onPressed:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>DiagnosticPage(d:d,reload:(){},guest:true))),
               style:OutlinedButton.styleFrom(foregroundColor:Colors.white,side:const BorderSide(color:Colors.white54),minimumSize:const Size.fromHeight(52)),
-              child:const Text('Take Free Diagnostic Test'),
+              child:const Text('Free General Reasoning Test'),
             ),
             const SizedBox(height:22),
             Row(mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[
@@ -388,13 +401,22 @@ class _Login extends State<Login>{
   Future<void>finish(Map<String,dynamic>u)async{
     final prefs=await Store.map('prefs');
     if(!mounted)return;
-    final remembered=widget.exam==null&&widget.test==null&&prefs?['primary']!=null;
-    if(remembered){
+    final target=widget.exam;
+    final matches=widget.d.exams.any((e)=>e['id']==target&&e['available']==true);
+    if(target!=null&&matches){
+      final selected=Set<String>.from(prefs?['selected']??[]);
+      selected.add(target);
+      await Store.set('prefs',{'selected':selected.toList(),'primary':target});
+      if(!mounted)return;
+      Navigator.pushAndRemoveUntil(context,MaterialPageRoute(builder:(_)=>Shell(d:widget.d,u:u,selected:selected,primary:target,initialTab:2)),(_)=>false);
+      return;
+    }
+    if(prefs?['primary']!=null){
       final primary='${prefs?['primary']}';
       final selected=Set<String>.from(prefs?['selected']??[primary]);
       Navigator.pushAndRemoveUntil(context,MaterialPageRoute(builder:(_)=>Shell(d:widget.d,u:u,selected:selected,primary:primary)),(_)=>false);
     }else{
-      Navigator.pushAndRemoveUntil(context,MaterialPageRoute(builder:(_)=>Goals(d:widget.d,u:u,pre:widget.exam,test:widget.test)),(_)=>false);
+      Navigator.pushAndRemoveUntil(context,MaterialPageRoute(builder:(_)=>Goals(d:widget.d,u:u)),(_)=>false);
     }
   }
   Future<void>go()async{
@@ -456,7 +478,16 @@ class _Register extends State<Register>{
   final name=TextEditingController(),email=TextEditingController(),mobile=TextEditingController(),password=TextEditingController(),confirm=TextEditingController();
   bool busy=false;String? err;
   Future<void>finish(Map<String,dynamic>u)async{
-    if(mounted)Navigator.pushAndRemoveUntil(context,MaterialPageRoute(builder:(_)=>Goals(d:widget.d,u:u,pre:widget.exam,test:widget.test)),(_)=>false);
+    final examId=widget.exam;
+    if(examId!=null&&widget.d.exams.any((exam)=>exam['id']==examId&&exam['available']==true)){
+      final previous=await Store.map('prefs');
+      final selected=Set<String>.from(previous?['selected']??[]);
+      selected.add(examId);
+      await Store.set('prefs',{'selected':selected.toList(),'primary':examId});
+      if(mounted)Navigator.pushAndRemoveUntil(context,MaterialPageRoute(builder:(_)=>Shell(d:widget.d,u:u,selected:selected,primary:examId,initialTab:2)),(_)=>false);
+      return;
+    }
+    if(mounted)Navigator.pushAndRemoveUntil(context,MaterialPageRoute(builder:(_)=>Goals(d:widget.d,u:u)),(_)=>false);
   }
   Future<void>go()async{
     if(password.text!=confirm.text){setState(()=>err='Passwords do not match.');return;}
@@ -544,7 +575,7 @@ class _Goals extends State<Goals>{
       final matches=widget.d.tests.where((t)=>t['id']==widget.test&&t['available']==true).toList();
       if(matches.isNotEmpty)launch=matches.first;
     }
-    if(mounted)Navigator.pushReplacement(context,MaterialPageRoute(builder:(_)=>Shell(d:widget.d,u:widget.u,selected:selected,primary:primary!,launch:launch)));
+    if(mounted)Navigator.pushReplacement(context,MaterialPageRoute(builder:(_)=>Shell(d:widget.d,u:widget.u,selected:selected,primary:primary!,launch:launch,initialTab:widget.pre!=null?2:0)));
   }
   @override Widget build(BuildContext c)=>Scaffold(
     appBar:AppBar(title:const Text('Choose your exam')),
@@ -633,12 +664,12 @@ List<Map<String,dynamic>> approvedQuestionRecords(Data d,String examId){
 }
 
 class Shell extends StatefulWidget{
-  final Data d;final Map<String,dynamic>u;final Set<String>selected;final String primary;final Map<String,dynamic>? launch;
-  const Shell({super.key,required this.d,required this.u,required this.selected,required this.primary,this.launch});
+  final Data d;final Map<String,dynamic>u;final Set<String>selected;final String primary;final Map<String,dynamic>? launch;final int initialTab;
+  const Shell({super.key,required this.d,required this.u,required this.selected,required this.primary,this.launch,this.initialTab=0});
   @override State<Shell>createState()=>_Shell();
 }
 class _Shell extends State<Shell>{
-  int tab=0;
+  late int tab=widget.initialTab;
   List<dynamic> results=[];
   Map<String,dynamic>? active;
   bool sound=true;
