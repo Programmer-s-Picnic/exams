@@ -176,7 +176,7 @@
     TestEngine.stop();
     closeModal();
     const { name, id } = currentRoute();
-    const publicRoutes = ['landing', 'landing-exams', 'landing-how', 'login', 'register', 'diagnostic', 'admin'];
+    const publicRoutes = ['landing', 'landing-exams', 'landing-how', 'login', 'register', 'diagnostic', 'result', 'review', 'admin'];
     const publicDiagnostic = (['instructions', 'attempt'].includes(name) && state.tests.some(test => test.id === id && test.type === 'diagnostic')) || (['result', 'review'].includes(name) && Boolean(TestEngine.temporaryGuestResult(id)));
     // Guest results exist only while the report or answer review is being viewed.
     if (!(['result', 'review'].includes(name) && TestEngine.temporaryGuestResult(id))) TestEngine.clearTemporaryGuestResult();
@@ -1019,10 +1019,14 @@
       </section>`;
   }
 
+  function renderExpiredGuestReport() {
+    document.getElementById('app').innerHTML = `<section class="page narrow diagnostic-page"><article class="instruction-card"><span class="eyebrow">GUEST DIAGNOSTIC</span><h1>This report is no longer available</h1><p>Guest results are displayed only while viewing the report and answer review. They are not stored after you leave or refresh. You can take the free diagnostic again as often as you wish.</p><a class="primary-button" href="#/diagnostic">Take another free diagnostic →</a></article></section>`;
+  }
+
   function renderResult(id) {
     const result = TestEngine.temporaryGuestResult(id) || TestEngine.getResults().find(item => item.id === id);
     const test = findTest(result?.testId) || findTest(result?.baseTestId);
-    if (!result || !test) return notFound('Result not found');
+    if (!result || !test) return !state.user ? renderExpiredGuestReport() : notFound('Result not found');
     if (result.type === 'diagnostic') return renderDiagnosticResult(result, test);
     const circumference = 339.3;
     document.getElementById('app').innerHTML = `
@@ -1079,7 +1083,7 @@
   function renderReview(id) {
     const result = TestEngine.temporaryGuestResult(id) || TestEngine.getResults().find(item => item.id === id);
     const test = findTest(result?.testId) || findTest(result?.baseTestId);
-    if (!result || !test) return notFound('Review not found');
+    if (!result || !test) return !state.user ? renderExpiredGuestReport() : notFound('Review not found');
     document.getElementById('app').innerHTML = `
       <section class="page narrow">
         <a class="back-link" href="#/result/${result.id}">← Back to result</a>
