@@ -1084,6 +1084,7 @@
       <section class="page narrow">
         <a class="back-link" href="#/result/${result.id}">← Back to result</a>
         <div class="page-hero compact"><span class="eyebrow">ANSWER REVIEW</span><h1>${test.title}</h1><p>Compare your choices with the correct answers and explanations.</p></div>
+        ${!state.user && result.type === 'diagnostic' ? guestNotice() : ''}
         <div class="review-list">${(result.questions || test.questions).map((question, index) => {
           const selected = result.answers[index];
           const correct = selected === question.correctOption;
@@ -1137,7 +1138,7 @@
           <details><summary>5. Take mock and diagnostic tests</summary><p>Retake the free diagnostic as many times as you wish, without logging in, and view a full report after every attempt. Sign in for other practice tests. Some tests use a whole-test timer, while others may use per-question timing or untimed practice.</p></details>
           <details><summary>6. Check your results</summary><p>Review your score, accuracy, unanswered questions and topic performance after completing a test.</p></details>
           <details><summary>7. Retake weak areas</summary><p>Where available, retake wrong questions, unanswered questions, or the complete test with fresh question and option shuffling.</p></details>
-          <details><summary>8. Are my active attempts saved?</summary><p>Yes. Active attempts are saved automatically in this browser so you can continue an unfinished test.</p></details>
+          <details><summary>8. Are my active attempts saved?</summary><p>Signed-in attempts and results are saved for your account. Without login, your free diagnostic, answers and report are never stored: view the report or review immediately because it disappears when you leave or reload.</p></details>
         </div>
         <div class="result-actions"><a class="primary-button" href="#/constable">Open my exam →</a><a class="ghost-button" href="#/tests">Browse tests</a><a class="ghost-button" href="#/results">View results</a></div>
       </section>`;
