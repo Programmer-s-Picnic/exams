@@ -676,7 +676,8 @@ class _Shell extends State<Shell>{
 
   List<Map<String,dynamic>> get tests{
     final base=widget.d.tests.where((t)=>
-      t['available']==true &&
+      t['audience']!='guest' && t['type']!='diagnostic' &&
+      !'${t['title']??''}'.toLowerCase().contains('diagnostic') &&
       List<dynamic>.from(t['examIds']??[t['examId']]).any(widget.selected.contains)
     ).toList();
     final generated=<Map<String,dynamic>>[];
@@ -696,8 +697,19 @@ class _Shell extends State<Shell>{
   Future<void>load()async{
     final local=await Store.list('results');
     final r=await syncResultsWithServer(local);
-    if(r.length!=local.length||jsonEncode(r)!=jsonEncode(local))await Store.set('results',r);
-    final a=await Store.map('active');
+    if(r.length!=local.length||jsonEncode(r)!=jsonEncode(local)){
+      try{await Store.set('results',r);}catch(_){/* Remote archive remains authoritative. */}
+    }
+    var a=await Store.map('active');
+    if(a!=null && r.any((row){
+      if(row is! Map || row['testId']!=a?['testId'])return false;
+      final completed=DateTime.tryParse('${row['date']??''}')?.millisecondsSinceEpoch??0;
+      final started=NumberTools.intValue(a?['startedAt']);
+      return completed>0 && (started==0||completed>=started);
+    })){
+      await Store.del('active');
+      a=null;
+    }
     final s=await Store.boolValue('sound');
     if(mounted)setState(() { results=r; active=a; sound=s; });
   }
@@ -713,7 +725,7 @@ class _Shell extends State<Shell>{
       HomePage(u:widget.u,tests:tests,exam:exam,results:results,active:active,reload:load,go:go,sound:sound),
       ExamHub(exam:exam,syllabus:syllabus,papers:widget.d.papers,tests:tests,results:results,reload:load,sound:sound),
       TestsPage(tests:tests,results:results,reload:load,sound:sound),
-      DiagnosticPage(d:widget.d,reload:load,sound:sound),
+      DiagnosticPage(d:widget.d,reload:load,sound:sound,selectedExam:widget.primary),
       ResultsPage(items:results,tests:widget.d.tests,reload:load,sound:sound),
       MorePage(
         d:widget.d,u:widget.u,exam:exam,sound:sound,onSound:toggleSound,
@@ -760,15 +772,17 @@ class HomePage extends StatelessWidget{
     final avg=results.isEmpty?0:(results.fold<num>(0,(a,r)=>a+NumberTools.numValue(r['percent']))/results.length).round();
     final passed=results.where((r)=>r['passed']==true).length;
     final completed=results.map((r)=>r['baseTestId']??r['testId']).toSet();
-    final next=tests.where((t)=>!completed.contains(t['id'])).toList();
-    final suggested=next.isNotEmpty?next.first:(tests.isNotEmpty?tests.first:null);
+    final published=tests.where((t)=>t['available']==true).toList();
+    final next=published.where((t)=>!completed.contains(t['id'])).toList();
+    final suggested=next.isNotEmpty?next.first:(published.isNotEmpty?published.first:null);
+    final diagnosticReports=results.where((r)=>r['type']=='diagnostic'&&r['examId']==exam['id']).toList();
     return ListView(padding:const EdgeInsets.all(18),children:[
       Text('Good ${dayPart()}, ${'${u['name']}'.split(' ').first}',style:const TextStyle(fontSize:28,fontWeight:FontWeight.w900)),
       const Text('Track your tests, results and current preparation priorities.',style:TextStyle(color:muted)),
       const SizedBox(height:16),
       Box(
         color:forest,
-        tap:()=>go(1),
+        tap:()=>go(2),
         child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
           const Text('PRIMARY GOAL',style:TextStyle(color:mint,fontSize:11,fontWeight:FontWeight.w900)),
           const SizedBox(height:8),
@@ -782,15 +796,19 @@ class HomePage extends StatelessWidget{
       ),
       Box(
         color:const Color(0xffe8f5ef),
-        tap:()=>go(3),
-        child:const Row(children:[
-          Icon(Icons.health_and_safety_outlined,color:blue),SizedBox(width:12),
+        tap:()=>go(diagnosticReports.isEmpty?3:4),
+        child:Row(children:[
+          const Icon(Icons.insights_outlined,color:blue),const SizedBox(width:12),
           Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-            Text('Take Free Diagnostic Test',style:TextStyle(fontWeight:FontWeight.w900)),
-            Text('Get a subject-wise report with preparation priorities.',style:TextStyle(color:muted)),
+            Text(diagnosticReports.isEmpty?'Take Exam Diagnostic':'View All Report Cards',style:const TextStyle(fontWeight:FontWeight.w900)),
+            Text(diagnosticReports.isEmpty?'Your selected exam, with a saved report.':'${diagnosticReports.length} diagnostic reports saved; open any attempt.',style:const TextStyle(color:muted)),
           ])),
-          Icon(Icons.chevron_right),
+          const Icon(Icons.chevron_right),
         ]),
+      ),
+      if(diagnosticReports.isNotEmpty)Align(
+        alignment:Alignment.centerLeft,
+        child:TextButton.icon(onPressed:()=>go(3),icon:const Icon(Icons.replay),label:const Text('Retake exam diagnostic →')),
       ),
       if(active!=null)Box(
         color:const Color(0xfffff6df),
@@ -815,7 +833,7 @@ class HomePage extends StatelessWidget{
       ]),
       const TitleText('Recommended next step'),
       if(suggested!=null)TestCard(t:suggested,tap:()=>instructions(c,suggested,reload,sound:sound))
-      else const Box(child:Text('No test is available yet.')),
+      else const Box(child:Text('No practice sessions have been published yet. The administrator controls availability.')),
       const TitleText('Quick access'),
       Row(children:[
         Expanded(child:ActionTile(icon:Icons.quiz_outlined,title:'Tests',tap:()=>go(2))),const SizedBox(width:8),
@@ -1022,8 +1040,8 @@ class _TestsPage extends State<TestsPage>{
       return matches&&(status=='all'||status=='completed'&&done||status=='new'&&!done);
     }).toList();
     return ListView(padding:const EdgeInsets.all(18),children:[
-      const Text('Practice tests',style:TextStyle(fontSize:28,fontWeight:FontWeight.w900)),
-      const Text('Search and filter tests for your selected examination.',style:TextStyle(color:muted)),
+      const Text('Exam Practice Sessions',style:TextStyle(fontSize:28,fontWeight:FontWeight.w900)),
+      const Text('Browse your selected exam. The administrator controls which sets are published.',style:TextStyle(color:muted)),
       const SizedBox(height:14),
       TextField(decoration:const InputDecoration(prefixIcon:Icon(Icons.search),hintText:'Search tests'),onChanged:(v)=>setState(()=>query=v)),
       const SizedBox(height:10),
@@ -1655,17 +1673,17 @@ class ExamCard extends StatelessWidget{
 }
 
 class TestCard extends StatelessWidget{
-  final Map<String,dynamic>t;final VoidCallback tap;
+  final Map<String,dynamic>t;final VoidCallback? tap;
   const TestCard({super.key,required this.t,required this.tap});
   @override Widget build(BuildContext c)=>Box(
-    tap:tap,
+    tap:t['available']==true?tap:null,
     child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-      Row(children:[Icon(t['type']=='diagnostic'?Icons.health_and_safety_outlined:Icons.assignment_outlined,color:blue),const Spacer(),Chip(label:Text('${t['difficulty']??'Practice'}'))]),
+      Row(children:[Icon(t['type']=='diagnostic'?Icons.health_and_safety_outlined:Icons.assignment_outlined,color:blue),const Spacer(),Chip(label:Text(t['available']==true?'${t['difficulty']??'Practice'}':'Coming soon'))]),
       Text('${t['title']}',style:const TextStyle(fontSize:18,fontWeight:FontWeight.w900)),
       Text('${t['description']}',style:const TextStyle(color:muted)),
       const SizedBox(height:9),
       Text('${(t['questions']as List).length} questions · ${t['totalMarks']} marks · ${((t['timing']['totalSeconds']as num)/60).round()} min',style:const TextStyle(fontWeight:FontWeight.w700)),
-      const Align(alignment:Alignment.centerRight,child:Text('View instructions →',style:TextStyle(color:blue,fontWeight:FontWeight.w800))),
+      Align(alignment:Alignment.centerRight,child:Text(t['available']==true?'View instructions →':'Not published by administrator',style:const TextStyle(color:blue,fontWeight:FontWeight.w800))),
     ]),
   );
 }
