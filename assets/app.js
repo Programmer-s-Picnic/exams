@@ -902,31 +902,32 @@
 
   function renderDiagnosticSelection() {
     const guest = state.user ? null : TestEngine.guestDiagnosticStatus();
+    const reports = state.user ? [] : TestEngine.guestDiagnosticResults();
     document.getElementById('app').innerHTML = `<section class="page diagnostic-page">
-      <div class="page-hero"><span class="eyebrow">FREE DIAGNOSTIC TEST</span><h1>Choose one examination</h1><p>One diagnostic test and its full report are available without login. Register or sign in to attempt more tests and track progress across devices.</p></div>
+      <div class="page-hero"><span class="eyebrow">UNLIMITED FREE DIAGNOSTICS</span><h1>Choose one examination</h1><p>Take the free diagnostic as often as you wish without registration or login. Receive a complete report after every attempt.</p></div>
       ${guestNotice()}
-      ${guest?.state === 'completed' ? '<div class="guest-limit-actions"><a class="primary-button" href="#/result/' + encodeURIComponent(guest.resultId) + '">View my free report →</a><a class="ghost-button" href="#/register">Register for more attempts</a></div>' : ''}
-      ${guest?.state === 'in-progress' ? '<div class="guest-limit-actions"><a class="primary-button" href="#/attempt/' + encodeURIComponent(guest.testId) + '">Resume my free diagnostic →</a></div>' : ''}
+      ${guest?.state === 'in-progress' ? '<div class="guest-limit-actions"><a class="primary-button" href="#/attempt/' + encodeURIComponent(guest.testId) + '">Resume unfinished diagnostic →</a></div>' : ''}
       <div class="diagnostic-exams">${state.exams.map(exam => {
         const paper = state.tests.find(test => test.type === 'diagnostic' && test.examId === exam.id && test.available);
-        const allowed = !guest || TestEngine.canStartGuestDiagnostic(paper?.id);
-        const button = paper ? allowed ? `<a class="primary-button" href="#/instructions/${encodeURIComponent(paper.id)}">${guest?.state === 'in-progress' ? 'Resume exam' : 'Select exam'} →</a>` : '<a class="ghost-button" href="#/register">Register to take another →</a>' : '<span class="coming-soon-action">Coming soon</span>';
-        return `<article class="diagnostic-exam"><span class="exam-icon">${icon(exam.icon)}</span><div><h2>${escapeHtml(exam.name)}</h2><p>${escapeHtml(exam.authority)}</p>${paper ? `<p>${paper.questions.length} questions · ${Math.round(paper.timing.totalSeconds / 60)} minutes · Diagnostic test</p>` : '<p>Diagnostic paper in preparation</p>'}</div>${button}</article>`;
-      }).join('')}</div></section>`;
+        const action = paper
+          ? `<a class="primary-button" href="#/instructions/${encodeURIComponent(paper.id)}">${guest?.state === 'in-progress' && guest.testId === paper.id ? 'Resume diagnostic' : reports.some(result => result.testId === paper.id) ? 'Retake diagnostic' : 'Take free diagnostic'} →</a>`
+          : '<span class="coming-soon-action">Coming soon</span>';
+        return `<article class="diagnostic-exam"><span class="exam-icon">${icon(exam.icon)}</span><div><h2>${escapeHtml(exam.name)}</h2><p>${escapeHtml(exam.authority)}</p>${paper ? `<p>${paper.questions.length} questions · ${Math.round(paper.timing.totalSeconds / 60)} minutes · Unlimited free retakes and reports</p>` : '<p>Diagnostic paper in preparation</p>'}</div>${action}</article>`;
+      }).join('')}</div>
+      ${reports.length ? `<section class="diagnostic-report-section"><h2>Your guest diagnostic reports</h2><p>Recent reports are stored in this browser. Sign in to transfer them to your account.</p><div class="result-list">${reports.slice(0, 20).map((result, index) => `<a class="result-row" href="#/result/${encodeURIComponent(result.id)}"><span class="score-orb">${Number(result.percent) || 0}%</span><span><strong>Attempt ${reports.length - index}: ${escapeHtml(result.title)}</strong><small>${formatDate(result.date)} · ${result.correct} correct · Full report</small></span><b>View report →</b></a>`).join('')}</div></section>` : ''}
+      </section>`;
   }
 
   function renderDiagnosticInstructions(test) {
-    if (!state.user && !TestEngine.canStartGuestDiagnostic(test.id)) return renderGuestLimit();
     document.getElementById('app').innerHTML = `<section class="page narrow diagnostic-page"><a class="back-link" href="#/diagnostic">← Choose exam</a>
       ${guestNotice()}<article class="instruction-card"><span class="eyebrow">FREE DIAGNOSTIC TEST</span><h1>${escapeHtml(test.title)}</h1><p>${escapeHtml(test.description)}</p>
       <p class="diagnostic-note">This ${test.questions.length}-question diagnostic assesses preparation across the available subjects. The timer, answer feedback and marking rules are fixed for this test.</p>
       <div class="instruction-stats"><div><strong>${test.questions.length}</strong><span>Questions</span></div><div><strong>${test.totalMarks}</strong><span>Maximum marks</span></div><div><strong>${Math.round(test.timing.totalSeconds / 60)} min</strong><span>Duration</span></div><div><strong>+${test.marking.correct} / ${test.marking.incorrect} / ${test.marking.unanswered}</strong><span>Correct / wrong / blank</span></div></div>
       <div class="rules-box"><h3>Assessment rules</h3><ul><li>One whole-paper timer; the paper submits when time ends.</li><li>Answers and explanations are shown after submission.</li><li>Progress saves in this browser, including on a page reload.</li></ul></div>
-      <label class="consent"><input type="checkbox" id="rulesAccepted"> I understand that one diagnostic and report are free without login; another attempt requires registration or sign-in.</label><button class="primary-button full large" id="startDiagnostic" disabled>${!state.user && TestEngine.guestDiagnosticStatus().state === "in-progress" ? "Resume diagnostic" : "Start free diagnostic"} →</button></article></section>`;
+      <label class="consent"><input type="checkbox" id="rulesAccepted"> I have read the instructions. I can take this free diagnostic again and view a complete report without logging in.</label><button class="primary-button full large" id="startDiagnostic" disabled>${!state.user && TestEngine.guestDiagnosticStatus().state === "in-progress" ? "Resume diagnostic" : "Start free diagnostic"} →</button></article></section>`;
     const button = document.getElementById('startDiagnostic');
     document.getElementById('rulesAccepted').onchange = event => { button.disabled = !event.target.checked; };
     button.onclick = () => {
-      if (!state.user && !TestEngine.canStartGuestDiagnostic(test.id)) return renderGuestLimit();
       const saved = TestEngine.activeAttempt();
       if (saved?.testId && saved.testId !== test.id && !confirm('Starting this paper will replace your saved unfinished attempt. Continue?')) return;
       if (saved?.testId !== test.id) localStorage.removeItem(TestEngine.storageKey);
@@ -952,7 +953,7 @@
       <section class="diagnostic-report-section"><h2>Topic-wise performance</h2>${report.topics.map(row => diagnosticBreakdown(row, `${report.subjects.find(subject => subject.id === row.subjectId)?.label || row.subjectId} · ${row.label}${row.total < 3 ? ' · needs more assessment' : ''}`)).join('')}</section>
       <section class="diagnostic-report-section"><h2>Areas of strength</h2><p>${report.strengths.length ? report.strengths.map(row => `${escapeHtml(row.label)} (${row.correct}/${row.total})`).join(' · ') : 'No topic has enough questions and a strong result to confirm a strength yet.'}</p></section>
       <section class="diagnostic-report-section"><h2>Focus areas</h2>${focus || '<p>No weakness can be established from this sample. Review unanswered questions and take more topic practice to gather evidence.</p>'}<p>${report.needsAssessment.length} topics have fewer than three questions and need more assessment before being labelled strengths or weaknesses.</p></section>
-      ${!state.user ? guestNotice() : ""}<div class="result-actions"><a class="primary-button" href="#/review/${result.id}">Review answers →</a><a class="ghost-button" href="${state.user ? '#/constable' : '#/landing-exams'}">View syllabus</a><a class="ghost-button" href="${state.user ? '#/tests' : '#/register'}">${state.user ? "Practise topics" : "Register for more tests"}</a>${state.user ? `<a class="ghost-button" href="#/instructions/${test.id}">Retake diagnostic</a>` : '<a class="ghost-button" href="#/login">Sign in for another diagnostic</a>'}</div></section>`;
+      ${!state.user ? guestNotice() : ""}<div class="result-actions"><a class="primary-button" href="#/review/${result.id}">Review answers →</a><a class="ghost-button" href="${state.user ? '#/constable' : '#/landing-exams'}">View syllabus</a><a class="ghost-button" href="${state.user ? '#/tests' : '#/register'}">${state.user ? "Practise topics" : "Register for practice tests"}</a><a class="ghost-button" href="#/instructions/${test.id}">Retake free diagnostic →</a></div></section>`;
   }
 
   function renderInstructions(id) {
@@ -1027,10 +1028,9 @@
   function beginAttempt(id) {
     const test = findTest(id);
     if (!test || !test.available) return notFound('This test is not available');
-    if (!state.user && test.type === 'diagnostic' && !TestEngine.canStartGuestDiagnostic(id)) return renderGuestLimit();
     const saved = TestEngine.activeAttempt();
     const settings = readSession('he_test_settings') || {};
-    if (TestEngine.start(test, { ...settings, sound: state.sound }, saved?.testId === id ? saved : null) === false) renderGuestLimit();
+    TestEngine.start(test, { ...settings, sound: state.sound }, saved?.testId === id ? saved : null);
   }
 
   function renderResults() {
@@ -1159,7 +1159,7 @@
           <details><summary>2. Review the syllabus</summary><p>Open the exam page and use the Syllabus section to understand the subjects and topics you need to prepare.</p></details>
           <details><summary>3. Review previous papers</summary><p>Use the Previous papers section to understand the examination style, year and shift information available for your exam.</p></details>
           <details><summary>4. Practise by subject and topic</summary><p>Use focused practice to strengthen individual areas before attempting longer tests.</p></details>
-          <details><summary>5. Take mock and diagnostic tests</summary><p>Read the instructions before starting. Some tests use a whole-test timer, while others may use per-question timing or untimed practice.</p></details>
+          <details><summary>5. Take mock and diagnostic tests</summary><p>Retake the free diagnostic as many times as you wish, without logging in, and view a full report after every attempt. Sign in for other practice tests. Some tests use a whole-test timer, while others may use per-question timing or untimed practice.</p></details>
           <details><summary>6. Check your results</summary><p>Review your score, accuracy, unanswered questions and topic performance after completing a test.</p></details>
           <details><summary>7. Retake weak areas</summary><p>Where available, retake wrong questions, unanswered questions, or the complete test with fresh question and option shuffling.</p></details>
           <details><summary>8. Are my active attempts saved?</summary><p>Yes. Active attempts are saved automatically in this browser so you can continue an unfinished test.</p></details>
