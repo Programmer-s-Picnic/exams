@@ -534,7 +534,7 @@
     document.getElementById('app').innerHTML = `
       <section class="page dashboard">
         <div class="welcome-row"><div><span class="eyebrow">${copy.eyebrow}</span><h1>Good ${dayPart()}, ${escapeHtml(state.user.name.split(' ')[0])}</h1><p>${copy.description}</p></div><a class="ghost-button" href="#/onboarding">Change goal</a></div>
-        <article class="focus-card" id="primaryExamCard" role="link" tabindex="0" aria-label="Open UP Police Constable exam">
+        <article class="focus-card" id="primaryExamCard" role="link" tabindex="0" aria-label="Open ${escapeHtml(primary?.name || 'selected exam')} practice">
           <div class="focus-copy"><span class="live-pill">● PRIMARY GOAL</span><h2>${primary?.name || 'Choose an examination'}</h2><p>${primary?.description || ''}</p><div class="focus-meta"><span>Authority <b>${primary?.authority || '—'}</b></span><span>Status <b>${primary?.status || '—'}</b></span></div></div>
           <div class="progress-ring" style="--progress:${average}"><span><strong>${average}%</strong><small>average</small></span></div>
           <a class="primary-button" href="${practiceRouteForPrimary}">Open exam practice →</a>
@@ -1213,16 +1213,16 @@
       <section class="page narrow">
         <div class="page-hero compact"><span class="eyebrow">STUDENT GUIDE</span><h1>How to use UP NaukriGuru</h1><p>Follow this sequence for a clear preparation workflow.</p></div>
         <div class="faq-list">
-          <details open><summary>1. Choose your examination</summary><p>Sign in, select your target examination and set the exam you want to focus on.</p></details>
+          <details open><summary>1. Choose your examination</summary><p>Use Select this exam to open its dedicated practice section. If you are not signed in, login or registration will bring you directly to that selected examination. You may change your main exam later from your profile.</p></details>
           <details><summary>2. Review the syllabus</summary><p>Open the exam page and use the Syllabus section to understand the subjects and topics you need to prepare.</p></details>
           <details><summary>3. Review previous papers</summary><p>Use the Previous papers section to understand the examination style, year and shift information available for your exam.</p></details>
-          <details><summary>4. Practise by subject and topic</summary><p>Use focused practice to strengthen individual areas before attempting longer tests.</p></details>
+          <details><summary>4. Practise by subject and topic</summary><p>Open your examination's practice sessions to find the tests published by the administrator. Unpublished tests remain marked Coming soon. Exam-specific diagnostics are accessed separately.</p></details>
           <details><summary>5. Take mock and diagnostic tests</summary><p>Guests can retake the general reasoning test freely, with a display-only report. Signed-in students take their selected-exam diagnostic with reshuffled questions and MCQ options on each new attempt; results are saved. Some tests use a whole-test timer, while others may use per-question timing or untimed practice.</p></details>
           <details><summary>6. Check your results</summary><p>Review your score, accuracy, unanswered questions and topic performance after completing a test.</p></details>
           <details><summary>7. Retake weak areas</summary><p>Where available, retake wrong questions, unanswered questions, or the complete test with fresh question and option shuffling.</p></details>
           <details><summary>8. Are my active attempts saved?</summary><p>Signed-in attempts and results are saved for your account. Without login, your free diagnostic, answers and report are never stored: view the report or review immediately because it disappears when you leave or reload.</p></details>
         </div>
-        <div class="result-actions"><a class="primary-button" href="#/constable">Open my exam →</a><a class="ghost-button" href="#/tests">Browse tests</a><a class="ghost-button" href="#/results">View results</a></div>
+        <div class="result-actions"><a class="primary-button" href="${state.preferences.primary ? examPracticeRoute(state.preferences.primary) : '#/onboarding'}">Open exam practice →</a><a class="ghost-button" href="#/constable">Exam overview</a><a class="ghost-button" href="#/results">View results</a></div>
       </section>`;
   }
 
