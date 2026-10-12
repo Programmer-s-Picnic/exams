@@ -24,8 +24,9 @@
     throw new Error('Content is temporarily unavailable. Please try again.');
   }
   const AUTH_ROOT = 'https://cserver.learnwithchampak.live/exams/api';
-  async function auth(path, data, token) {
-    const response = await request(`${AUTH_ROOT}/${path}.php`, {
+  async function auth(path, data, token, queryParams = null) {
+    const query = queryParams ? '?' + new URLSearchParams(queryParams).toString() : '';
+    const response = await request(`${AUTH_ROOT}/${path}.php${query}`, {
       method: data === undefined ? 'GET' : 'POST', retries: 0, responseType: 'response', acceptErrors: true,
       headers: { 'Accept': 'application/json', ...(data === undefined ? {} : { 'Content-Type': 'application/json' }), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       ...(data === undefined ? {} : { body: JSON.stringify(data) })
