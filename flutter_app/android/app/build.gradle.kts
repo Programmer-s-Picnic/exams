@@ -25,7 +25,7 @@ android {
     kotlinOptions { jvmTarget = JavaVersion.VERSION_17.toString() }
 
     defaultConfig {
-        applicationId = "live.learnwithchampak.himanshu_exams"
+        applicationId = "live.learnwithchampak.exampreps"
         minSdk = 23
         targetSdk = 36
         versionCode = flutter.versionCode
