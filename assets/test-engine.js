@@ -4,42 +4,50 @@
   let timerId = null;
   let resultHandler = null;
   let currentUserId = null;
-  const GUEST_TRIAL_KEY = 'he_guest_diagnostic_once_v1';
-  const GUEST_CLAIM_KEY = 'he_guest_diagnostic_claimed_by_v1';
+  const LEGACY_CLAIM_KEY = 'he_guest_diagnostic_claimed_by_v1';
+  const GUEST_CLAIMS_KEY = 'he_guest_diagnostic_claims_v2';
 
-  // Anonymous entitlement lives in this browser. Authentication enables further attempts.
   function storedJson(key, fallback = null) {
     try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch (_) { return fallback; }
   }
-  function guestDiagnosticResult() {
+  function guestDiagnosticResults() {
     const results = storedJson('he_results_v2_guest', []);
-    return Array.isArray(results) ? results.find(result => result?.type === 'diagnostic') || null : null;
+    return Array.isArray(results) ? results.filter(result => result?.type === 'diagnostic') : [];
   }
   function guestDiagnosticStatus() {
-    const completed = guestDiagnosticResult();
-    const entitlement = storedJson(GUEST_TRIAL_KEY);
     const saved = storedJson('he_active_attempt_v2_guest');
-    if (completed) return { state: 'completed', testId: completed.testId, resultId: completed.id };
-    if (entitlement?.testId) {
-      return { state: saved?.type === 'diagnostic' && saved.testId === entitlement.testId ? 'in-progress' : 'locked', testId: entitlement.testId, resultId: null };
-    }
-    if (saved?.type === 'diagnostic') return { state: 'in-progress', testId: saved.testId, resultId: null };
-    return { state: 'available', testId: null, resultId: null };
+    const latest = guestDiagnosticResults()[0] || null;
+    return {
+      state: saved?.type === 'diagnostic' ? 'in-progress' : latest ? 'completed' : 'available',
+      testId: saved?.type === 'diagnostic' ? saved.testId : latest?.testId || null,
+      resultId: latest?.id || null
+    };
   }
-  function canStartGuestDiagnostic(testId) {
-    const status = guestDiagnosticStatus();
-    return status.state === 'available' || (status.state === 'in-progress' && status.testId === testId);
+  function guestClaimOwnership() {
+    const claims = storedJson(GUEST_CLAIMS_KEY, {});
+    const owners = claims && typeof claims === 'object' && !Array.isArray(claims) ? { ...claims } : {};
+    // Preserve ownership of the one historical guest report imported before unlimited retakes.
+    const legacyOwner = localStorage.getItem(LEGACY_CLAIM_KEY);
+    const reports = guestDiagnosticResults();
+    if (legacyOwner && reports.length && !owners[reports[reports.length - 1].id]) {
+      owners[reports[reports.length - 1].id] = String(legacyOwner);
+    }
+    return owners;
+  }
+  function unclaimedGuestResults() {
+    const owners = guestClaimOwnership();
+    return guestDiagnosticResults().filter(result => !owners[result.id]);
   }
   function guestTransferAvailable() {
-    const claim = localStorage.getItem(GUEST_CLAIM_KEY);
-    return currentUserId !== null && Boolean(guestDiagnosticResult()) && !claim;
+    return currentUserId !== null && unclaimedGuestResults().length > 0;
   }
   function claimGuestDiagnostic() {
     if (!guestTransferAvailable()) return false;
-    const report = guestDiagnosticResult();
-    mergeResults([report]);
-    localStorage.setItem(GUEST_CLAIM_KEY, String(currentUserId));
-    // Keep the anonymous report so signing out does not reset the guest allowance.
+    const pending = unclaimedGuestResults();
+    mergeResults(pending);
+    const owners = guestClaimOwnership();
+    pending.forEach(result => { owners[result.id] = String(currentUserId); });
+    localStorage.setItem(GUEST_CLAIMS_KEY, JSON.stringify(owners));
     return true;
   }
 
@@ -115,12 +123,6 @@
 
   function start(test, settings = {}, saved = null) {
     clearInterval(timerId);
-    if (currentUserId === null && test.type === 'diagnostic') {
-      const status = guestDiagnosticStatus();
-      if (!canStartGuestDiagnostic(test.id)) return false;
-      if (status.state === 'in-progress' && (!saved || saved.testId !== test.id)) return false;
-      if (status.state === 'available') localStorage.setItem(GUEST_TRIAL_KEY, JSON.stringify({ testId: test.id, startedAt: Date.now() }));
-    }
     state.test = test;
     const diagnostic = test.type === 'diagnostic';
     state.markingMode = diagnostic ? 'default' : saved?.markingMode || settings.markingMode || 'default';
@@ -329,7 +331,7 @@
     const totalMarks = questions.reduce((sum, question) => sum + Number(state.markingMode === 'custom' ? state.marking.correct : question.marks ?? state.marking?.correct ?? 1), 0);
     const percent = Math.max(0, Math.round((score / totalMarks) * 100));
     const result = {
-      id: `result-${Date.now()}`,
+      id: `result-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
       testId: state.test.id,
       type: state.test.type || 'practice',
       examId: state.test.examId || state.test.examIds?.[0] || null,
@@ -355,9 +357,6 @@
     const results = getResults();
     results.unshift(result);
     localStorage.setItem(RESULT_KEY, JSON.stringify(results.slice(0, 500)));
-    if (currentUserId === null && state.test.type === 'diagnostic') {
-      localStorage.setItem(GUEST_TRIAL_KEY, JSON.stringify({ testId: state.test.id, resultId: result.id, completedAt: Date.now() }));
-    }
     localStorage.removeItem(STORAGE_KEY);
     if (resultHandler) Promise.resolve(resultHandler(result)).catch(() => {});
     window.App.closeModal();
@@ -400,5 +399,5 @@
     }
   }
 
-  window.TestEngine = { start, stop, activeAttempt, getResults, mergeResults, setResultHandler, formatTime, setSound, setUser, guestDiagnosticStatus, canStartGuestDiagnostic, guestTransferAvailable, claimGuestDiagnostic, get storageKey() { return STORAGE_KEY; } };
+  window.TestEngine = { start, stop, activeAttempt, getResults, mergeResults, setResultHandler, formatTime, setSound, setUser, guestDiagnosticStatus, guestDiagnosticResults, guestTransferAvailable, claimGuestDiagnostic, get storageKey() { return STORAGE_KEY; } };
 }());
