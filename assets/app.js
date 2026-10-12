@@ -1105,7 +1105,7 @@
     const diagnosticCount = results.filter(result => result.type === 'diagnostic').length;
     document.getElementById('app').innerHTML = `
       <section class="page">
-        <div class="page-hero compact"><span class="eyebrow">PERMANENT STUDENT HISTORY</span><h1>All Report Cards</h1><p>${results.length} saved report card${results.length === 1 ? '' : 's'}, including ${diagnosticCount} diagnostic attempt${diagnosticCount === 1 ? '' : 's'}. Each attempt is kept separately with its original score and answer review.</p>
+        <div class="page-hero compact"><span class="eyebrow">SAVED STUDENT HISTORY</span><h1>All Report Cards</h1><p>${results.length} saved report card${results.length === 1 ? '' : 's'}, including ${diagnosticCount} diagnostic attempt${diagnosticCount === 1 ? '' : 's'}. Each attempt is kept separately with its original score and answer review.</p>
         <div class="result-actions"><a class="primary-button" href="#/diagnostic">Take another diagnostic →</a><a class="ghost-button" href="#/home">Back to dashboard</a></div></div>
         ${results.length ? `<div class="result-list">${results.map(result => `
           <a href="#/result/${encodeURIComponent(result.id)}" class="result-row"><span class="score-orb ${result.passed ? 'pass' : 'fail'}">${result.percent}%</span><span><strong>${escapeHtml(result.title || 'Test report')}</strong><small>${result.type === 'diagnostic' ? 'Diagnostic' : 'Practice / mock'} · ${escapeHtml(String(result.date || '').slice(0, 10))} · ${result.correct} correct · ${TestEngine.formatTime(result.timeSeconds)}</small></span><b>View Report Card →</b></a>`).join('')}</div>`
