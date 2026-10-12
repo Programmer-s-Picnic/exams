@@ -18,26 +18,8 @@
   };
 
   function guestNotice() {
-    if (state.user) return '<div class="guest-access-note"><strong>Unlimited free diagnostic tests and complete reports.</strong> You may retake the diagnostic whenever you wish. Your account can keep your results.</div>';
-    const guest = TestEngine.guestDiagnosticStatus();
-    const latest = TestEngine.guestDiagnosticResults()[0];
-    const resume = guest.state === 'in-progress' ? ' <a href="#/attempt/' + encodeURIComponent(guest.testId) + '">Resume your unfinished diagnostic</a>.' : '';
-    const previous = latest ? ' <a href="#/result/' + encodeURIComponent(latest.id) + '">View your latest report</a>.' : '';
-    return '<div class="guest-access-note"><strong>Unlimited free diagnostic tests + full reports — no login or registration required.</strong> Retake as often as you wish.' + resume + previous + ' Reports are stored in this browser. <a href="#/register">Register</a> or <a href="#/login">sign in</a> for practice features and account-based progress tracking.</div>';
-  }
-  function guestClaimBanner() {
-    return state.user && TestEngine.guestTransferAvailable()
-      ? '<article class="guest-claim-banner"><div><strong>Save your guest diagnostic reports</strong><p>Transfer unclaimed reports from this browser to your signed-in account. Your existing results are preserved.</p></div><button type="button" class="primary-button" data-claim-guest>Save guest reports to my account</button></article>'
-      : '';
-  }
-  function wireGuestClaim() {
-    document.querySelectorAll('[data-claim-guest]').forEach(button => button.addEventListener('click', async () => {
-      button.disabled = true;
-      if (!TestEngine.claimGuestDiagnostic()) { button.disabled = false; return; }
-      await syncResultsWithServer();
-      toast('Guest diagnostic reports added to your account.');
-      route();
-    }));
+    if (state.user) return '<div class="guest-access-note"><strong>Unlimited free diagnostics.</strong> Signed-in tests can be saved to your account.</div>';
+    return '<div class="guest-access-note"><strong>Unlimited free diagnostic tests and full reports — no login required.</strong> Your report and answer review are shown only for this attempt. Nothing is saved; leaving the report or refreshing the page discards it. You can take another test whenever you wish.</div>';
   }
 
   function read(key) {
@@ -195,7 +177,9 @@
     closeModal();
     const { name, id } = currentRoute();
     const publicRoutes = ['landing', 'landing-exams', 'landing-how', 'login', 'register', 'diagnostic', 'admin'];
-    const publicDiagnostic = (['instructions', 'attempt'].includes(name) && state.tests.some(test => test.id === id && test.type === 'diagnostic')) || (['result', 'review'].includes(name) && TestEngine.getResults().some(result => result.id === id && result.type === 'diagnostic'));
+    const publicDiagnostic = (['instructions', 'attempt'].includes(name) && state.tests.some(test => test.id === id && test.type === 'diagnostic')) || (['result', 'review'].includes(name) && Boolean(TestEngine.temporaryGuestResult(id)));
+    // Guest results exist only while the report or answer review is being viewed.
+    if (!(['result', 'review'].includes(name) && TestEngine.temporaryGuestResult(id))) TestEngine.clearTemporaryGuestResult();
     if (!state.user && !publicRoutes.includes(name) && !publicDiagnostic) {
       sessionStorage.setItem('he_after_login', location.hash || '#/home');
       location.hash = '#/login';
@@ -232,7 +216,6 @@
       help: renderHelp
     };
     (routes[name] || (state.user ? renderDashboard : renderLanding))();
-    wireGuestClaim();
     const syncButton = document.getElementById('syncResultsNow');
     if (syncButton) syncButton.onclick = async () => {
       syncButton.disabled = true;
@@ -252,9 +235,8 @@
       return `<div><strong>${value}</strong><span>${item.label}</span></div>`;
     }).join('');
     const featuredTest = state.tests.find(test => test.available) || state.tests[0];
-    const guest = state.user ? null : TestEngine.guestDiagnosticStatus();
-    const diagnosticHeroLabel = guest?.state === 'in-progress' ? 'Resume My Free Diagnostic →' : guest?.state === 'completed' ? 'Retake Free Diagnostic →' : 'Take Free Diagnostic →';
-    const diagnosticHeroRoute = guest?.state === 'in-progress' ? '#/attempt/' + encodeURIComponent(guest.testId) : '#/diagnostic';
+    const diagnosticHeroLabel = 'Take Free Diagnostic →';
+    const diagnosticHeroRoute = '#/diagnostic';
     document.getElementById('app').innerHTML = `
       <div class="public-landing">
         <section class="landing-hero">
@@ -275,7 +257,7 @@
         <section class="landing-section diagnostic-section">
           <article class="diagnostic-panel">
             <div><span class="landing-eyebrow">${content.diagnostic.eyebrow}</span><h2>${content.diagnostic.title}</h2><p>${content.diagnostic.description}</p><div class="diagnostic-facts">${content.diagnostic.facts.map(fact => `<span>✓ ${fact}</span>`).join('')}</div></div>
-            <div class="diagnostic-preview"><span class="preview-label">${featuredTest.category}</span><h3>${featuredTest.title}</h3><div><b>${featuredTest.questions.length}</b><small>Questions</small></div><div><b>${Math.round(featuredTest.timing.totalSeconds / 60)}</b><small>Minutes</small></div><a class="mint-button" href="${diagnosticHeroRoute}">${guest?.state === 'completed' ? 'Retake free diagnostic' : 'Take free diagnostic + full report'} →</a></div>
+            <div class="diagnostic-preview"><span class="preview-label">${featuredTest.category}</span><h3>${featuredTest.title}</h3><div><b>${featuredTest.questions.length}</b><small>Questions</small></div><div><b>${Math.round(featuredTest.timing.totalSeconds / 60)}</b><small>Minutes</small></div><a class="mint-button" href="${diagnosticHeroRoute}">Take free diagnostic + full report →</a></div>
           </article>
         </section>
         <section class="landing-section" id="landingHow">
@@ -427,7 +409,6 @@
     document.getElementById('app').innerHTML = `
       <section class="onboarding-page">
         <div class="stepbar"><button class="icon-button" id="onboardingBack">←</button><span><i></i>Step 1 of 2 · Personalise your plan</span><a href="#/help" class="icon-button">?</a></div>
-        ${guestClaimBanner()}
         <div class="onboarding-hero">
           <span class="eyebrow">${copy.eyebrow}</span>
           <h1>${copy.title}</h1>
@@ -508,7 +489,6 @@
     const nextTest = relevantTests.find(test => !completedIds.has(test.id)) || relevantTests[0];
     document.getElementById('app').innerHTML = `
       <section class="page dashboard">
-        ${guestClaimBanner()}
         <div class="welcome-row"><div><span class="eyebrow">${copy.eyebrow}</span><h1>Good ${dayPart()}, ${escapeHtml(state.user.name.split(' ')[0])}</h1><p>${copy.description}</p></div><a class="ghost-button" href="#/onboarding">Change goal</a></div>
         <article class="focus-card" id="primaryExamCard" role="link" tabindex="0" aria-label="Open UP Police Constable exam">
           <div class="focus-copy"><span class="live-pill">● PRIMARY GOAL</span><h2>${primary?.name || 'Choose an examination'}</h2><p>${primary?.description || ''}</p><div class="focus-meta"><span>Authority <b>${primary?.authority || '—'}</b></span><span>Status <b>${primary?.status || '—'}</b></span></div></div>
@@ -901,21 +881,16 @@
   function refreshTestList() { document.getElementById('testList').innerHTML = filteredTests().map(test => testCard(test)).join('') || '<div class="empty-state"><h3>No tests found</h3><p>Try changing the filters.</p></div>'; }
 
   function renderDiagnosticSelection() {
-    const guest = state.user ? null : TestEngine.guestDiagnosticStatus();
-    const reports = state.user ? [] : TestEngine.guestDiagnosticResults();
     document.getElementById('app').innerHTML = `<section class="page diagnostic-page">
-      <div class="page-hero"><span class="eyebrow">UNLIMITED FREE DIAGNOSTICS</span><h1>Choose one examination</h1><p>Take the free diagnostic as often as you wish without registration or login. Receive a complete report after every attempt.</p></div>
+      <div class="page-hero"><span class="eyebrow">UNLIMITED FREE DIAGNOSTICS</span><h1>Choose one examination</h1><p>Take a diagnostic as often as you wish, without login. See the full report and answer review after each attempt; guest results are not saved.</p></div>
       ${guestNotice()}
-      ${guest?.state === 'in-progress' ? '<div class="guest-limit-actions"><a class="primary-button" href="#/attempt/' + encodeURIComponent(guest.testId) + '">Resume unfinished diagnostic →</a></div>' : ''}
       <div class="diagnostic-exams">${state.exams.map(exam => {
         const paper = state.tests.find(test => test.type === 'diagnostic' && test.examId === exam.id && test.available);
         const action = paper
-          ? `<a class="primary-button" href="#/instructions/${encodeURIComponent(paper.id)}">${guest?.state === 'in-progress' && guest.testId === paper.id ? 'Resume diagnostic' : reports.some(result => result.testId === paper.id) ? 'Retake diagnostic' : 'Take free diagnostic'} →</a>`
+          ? `<a class="primary-button" href="#/instructions/${encodeURIComponent(paper.id)}">Take free diagnostic →</a>`
           : '<span class="coming-soon-action">Coming soon</span>';
-        return `<article class="diagnostic-exam"><span class="exam-icon">${icon(exam.icon)}</span><div><h2>${escapeHtml(exam.name)}</h2><p>${escapeHtml(exam.authority)}</p>${paper ? `<p>${paper.questions.length} questions · ${Math.round(paper.timing.totalSeconds / 60)} minutes · Unlimited free retakes and reports</p>` : '<p>Diagnostic paper in preparation</p>'}</div>${action}</article>`;
-      }).join('')}</div>
-      ${reports.length ? `<section class="diagnostic-report-section"><h2>Your guest diagnostic reports</h2><p>Recent reports are stored in this browser. Sign in to transfer them to your account.</p><div class="result-list">${reports.slice(0, 20).map((result, index) => `<a class="result-row" href="#/result/${encodeURIComponent(result.id)}"><span class="score-orb">${Number(result.percent) || 0}%</span><span><strong>Attempt ${reports.length - index}: ${escapeHtml(result.title)}</strong><small>${formatDate(result.date)} · ${result.correct} correct · Full report</small></span><b>View report →</b></a>`).join('')}</div></section>` : ''}
-      </section>`;
+        return `<article class="diagnostic-exam"><span class="exam-icon">${icon(exam.icon)}</span><div><h2>${escapeHtml(exam.name)}</h2><p>${escapeHtml(exam.authority)}</p>${paper ? `<p>${paper.questions.length} questions · ${Math.round(paper.timing.totalSeconds / 60)} minutes · Unlimited free retakes · No results saved</p>` : '<p>Diagnostic paper in preparation</p>'}</div>${action}</article>`;
+      }).join('')}</div></section>`;
   }
 
   function renderDiagnosticInstructions(test) {
@@ -923,8 +898,8 @@
       ${guestNotice()}<article class="instruction-card"><span class="eyebrow">FREE DIAGNOSTIC TEST</span><h1>${escapeHtml(test.title)}</h1><p>${escapeHtml(test.description)}</p>
       <p class="diagnostic-note">This ${test.questions.length}-question diagnostic assesses preparation across the available subjects. The timer, answer feedback and marking rules are fixed for this test.</p>
       <div class="instruction-stats"><div><strong>${test.questions.length}</strong><span>Questions</span></div><div><strong>${test.totalMarks}</strong><span>Maximum marks</span></div><div><strong>${Math.round(test.timing.totalSeconds / 60)} min</strong><span>Duration</span></div><div><strong>+${test.marking.correct} / ${test.marking.incorrect} / ${test.marking.unanswered}</strong><span>Correct / wrong / blank</span></div></div>
-      <div class="rules-box"><h3>Assessment rules</h3><ul><li>One whole-paper timer; the paper submits when time ends.</li><li>Answers and explanations are shown after submission.</li><li>Progress saves in this browser, including on a page reload.</li></ul></div>
-      <label class="consent"><input type="checkbox" id="rulesAccepted"> I have read the instructions. I can take this free diagnostic again and view a complete report without logging in.</label><button class="primary-button full large" id="startDiagnostic" disabled>${!state.user && TestEngine.guestDiagnosticStatus().state === "in-progress" ? "Resume diagnostic" : "Start free diagnostic"} →</button></article></section>`;
+      <div class="rules-box"><h3>Assessment rules</h3><ul><li>One whole-paper timer; the paper submits when time ends.</li><li>Answers and explanations are shown after submission.</li><li>${state.user ? 'Your progress saves in this browser, including on a page reload.' : 'For guests, answers and results are not saved. Refreshing or leaving the test discards progress.'}</li></ul></div>
+      <label class="consent"><input type="checkbox" id="rulesAccepted"> I have read the instructions. I can take this free diagnostic again and view a complete report without logging in.</label><button class="primary-button full large" id="startDiagnostic" disabled>Start free diagnostic →</button></article></section>`;
     const button = document.getElementById('startDiagnostic');
     document.getElementById('rulesAccepted').onchange = event => { button.disabled = !event.target.checked; };
     button.onclick = () => {
@@ -1045,7 +1020,7 @@
   }
 
   function renderResult(id) {
-    const result = TestEngine.getResults().find(item => item.id === id);
+    const result = TestEngine.temporaryGuestResult(id) || TestEngine.getResults().find(item => item.id === id);
     const test = findTest(result?.testId) || findTest(result?.baseTestId);
     if (!result || !test) return notFound('Result not found');
     if (result.type === 'diagnostic') return renderDiagnosticResult(result, test);
@@ -1102,7 +1077,7 @@
   }
 
   function renderReview(id) {
-    const result = TestEngine.getResults().find(item => item.id === id);
+    const result = TestEngine.temporaryGuestResult(id) || TestEngine.getResults().find(item => item.id === id);
     const test = findTest(result?.testId) || findTest(result?.baseTestId);
     if (!result || !test) return notFound('Review not found');
     document.getElementById('app').innerHTML = `
