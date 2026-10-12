@@ -3,6 +3,45 @@
   let RESULT_KEY = 'he_results_v2_guest';
   let timerId = null;
   let resultHandler = null;
+  let currentUserId = null;
+  const GUEST_TRIAL_KEY = 'he_guest_diagnostic_once_v1';
+  const GUEST_CLAIM_KEY = 'he_guest_diagnostic_claimed_by_v1';
+
+  // Anonymous entitlement lives in this browser. Authentication enables further attempts.
+  function storedJson(key, fallback = null) {
+    try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch (_) { return fallback; }
+  }
+  function guestDiagnosticResult() {
+    const results = storedJson('he_results_v2_guest', []);
+    return Array.isArray(results) ? results.find(result => result?.type === 'diagnostic') || null : null;
+  }
+  function guestDiagnosticStatus() {
+    const completed = guestDiagnosticResult();
+    const entitlement = storedJson(GUEST_TRIAL_KEY);
+    const saved = storedJson('he_active_attempt_v2_guest');
+    if (completed) return { state: 'completed', testId: completed.testId, resultId: completed.id };
+    if (entitlement?.testId) {
+      return { state: saved?.type === 'diagnostic' && saved.testId === entitlement.testId ? 'in-progress' : 'locked', testId: entitlement.testId, resultId: null };
+    }
+    if (saved?.type === 'diagnostic') return { state: 'in-progress', testId: saved.testId, resultId: null };
+    return { state: 'available', testId: null, resultId: null };
+  }
+  function canStartGuestDiagnostic(testId) {
+    const status = guestDiagnosticStatus();
+    return status.state === 'available' || (status.state === 'in-progress' && status.testId === testId);
+  }
+  function guestTransferAvailable() {
+    const claim = localStorage.getItem(GUEST_CLAIM_KEY);
+    return currentUserId !== null && Boolean(guestDiagnosticResult()) && !claim;
+  }
+  function claimGuestDiagnostic() {
+    if (!guestTransferAvailable()) return false;
+    const report = guestDiagnosticResult();
+    mergeResults([report]);
+    localStorage.setItem(GUEST_CLAIM_KEY, String(currentUserId));
+    // Keep the anonymous report so signing out does not reset the guest allowance.
+    return true;
+  }
 
   const state = {
     test: null,
@@ -76,6 +115,12 @@
 
   function start(test, settings = {}, saved = null) {
     clearInterval(timerId);
+    if (currentUserId === null && test.type === 'diagnostic') {
+      const status = guestDiagnosticStatus();
+      if (!canStartGuestDiagnostic(test.id)) return false;
+      if (status.state === 'in-progress' && (!saved || saved.testId !== test.id)) return false;
+      if (status.state === 'available') localStorage.setItem(GUEST_TRIAL_KEY, JSON.stringify({ testId: test.id, startedAt: Date.now() }));
+    }
     state.test = test;
     const diagnostic = test.type === 'diagnostic';
     state.markingMode = diagnostic ? 'default' : saved?.markingMode || settings.markingMode || 'default';
@@ -97,6 +142,7 @@
     state.questionEndsAt = saved?.questionEndsAt || null;
     open(state.current, Boolean(saved));
     tone(760);
+    return true;
   }
 
   function open(index, preserveQuestionTimer = false) {
@@ -309,6 +355,9 @@
     const results = getResults();
     results.unshift(result);
     localStorage.setItem(RESULT_KEY, JSON.stringify(results.slice(0, 500)));
+    if (currentUserId === null && state.test.type === 'diagnostic') {
+      localStorage.setItem(GUEST_TRIAL_KEY, JSON.stringify({ testId: state.test.id, resultId: result.id, completedAt: Date.now() }));
+    }
     localStorage.removeItem(STORAGE_KEY);
     if (resultHandler) Promise.resolve(resultHandler(result)).catch(() => {});
     window.App.closeModal();
@@ -340,6 +389,7 @@
   function setSound(value) { state.sound = value; }
   function setUser(id) {
     stop(); state.test = null;
+    currentUserId = id == null ? null : String(id);
     const suffix = id == null ? 'guest' : String(id);
     STORAGE_KEY = `he_active_attempt_v2_${suffix}`;
     RESULT_KEY = `he_results_v2_${suffix}`;
@@ -350,5 +400,5 @@
     }
   }
 
-  window.TestEngine = { start, stop, activeAttempt, getResults, mergeResults, setResultHandler, formatTime, setSound, setUser, get storageKey() { return STORAGE_KEY; } };
+  window.TestEngine = { start, stop, activeAttempt, getResults, mergeResults, setResultHandler, formatTime, setSound, setUser, guestDiagnosticStatus, canStartGuestDiagnostic, guestTransferAvailable, claimGuestDiagnostic, get storageKey() { return STORAGE_KEY; } };
 }());
