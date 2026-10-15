@@ -21,3 +21,9 @@
 #advancedEditorPane>summary{cursor:pointer;font-weight:650;color:#183c55}
 #advancedEditorPane .admin-editor{margin:12px 0;min-height:260px}
 @media(max-width:650px){.ev-shell{padding:10px}.ev-fields{grid-template-columns:1fr}.ev-toolbar{align-items:stretch}.ev-search{max-width:none!important}}
+
+/* File-specific plain-language guidance in the content editor */
+.admin-file-help{background:#eef6fc;border:1px solid #c8dbe9;border-left:4px solid #277bb1;border-radius:9px;padding:12px 15px;margin:12px 0 17px;color:#15374d;line-height:1.5}
+.admin-file-help strong{display:block;font-size:1rem;margin-bottom:4px;color:#143b55}
+.admin-file-help p{margin:5px 0;font-size:.9rem;overflow-wrap:anywhere}
+.admin-file-help small{display:block;margin-top:9px;color:#45667a}
