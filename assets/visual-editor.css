@@ -1,0 +1,23 @@
+/* ExamPreps visual editing experience — admin-only */
+.ev-shell{border:1px solid #cbdbe8;background:#f8fbff;border-radius:16px;padding:18px;color:#183149}
+.ev-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.ev-search,.ev-shell input:not([type=checkbox]),.ev-shell textarea{box-sizing:border-box;max-width:100%;width:100%;background:#fff!important;color:#10263a!important;border:1px solid #adbfce!important;border-radius:8px;padding:11px 12px;font:inherit}
+.ev-search{max-width:420px!important}
+.ev-shell input:focus,.ev-shell textarea:focus{outline:2px solid #1d78bb;outline-offset:1px}
+.ev-shell textarea{min-height:96px;resize:vertical}
+.ev-muted{display:block;color:#576f80;font-size:.86rem;margin-top:5px}
+.ev-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:14px}
+.ev-root{display:grid;gap:16px}
+.ev-field{min-width:0;display:flex;flex-direction:column;gap:6px}
+.ev-label{font-weight:650;font-size:.91rem;color:#193e58}
+.ev-section,.ev-record{border:1px solid #cfdfec;border-radius:12px;background:white;padding:11px;margin:6px 0;min-width:0}
+.ev-section>summary,.ev-record>summary{font-weight:650;cursor:pointer;line-height:1.5;overflow-wrap:anywhere;color:#174967}
+.ev-section[open]>summary,.ev-record[open]>summary{margin-bottom:12px}
+.ev-list{display:grid;gap:10px}
+.ev-actions{display:flex;justify-content:flex-end;gap:8px;margin:6px 0 16px}
+.ev-array-row{display:flex;align-items:center;gap:8px}
+.ev-array-row .ev-input-wrap{flex:1;min-width:0}
+#advancedEditorPane{margin-top:16px;padding:14px;border:1px solid #bacfdf;border-radius:10px;background:#eef6fc}
+#advancedEditorPane>summary{cursor:pointer;font-weight:650;color:#183c55}
+#advancedEditorPane .admin-editor{margin:12px 0;min-height:260px}
+@media(max-width:650px){.ev-shell{padding:10px}.ev-fields{grid-template-columns:1fr}.ev-toolbar{align-items:stretch}.ev-search{max-width:none!important}}
