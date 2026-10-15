@@ -223,6 +223,33 @@
     return { name: parts[0], id: parts[1] };
   }
 
+  // Hash-based student/admin screens are not separate public search results.
+  // Only the public landing is indexable; static guides have their own canonical URLs.
+  function updateRouteSeo(name) {
+    const isLanding = !state.user && ['landing', 'landing-exams', 'landing-how'].includes(name);
+    const pageTitle = isLanding
+      ? 'UP Police Constable Mock Tests & Diagnostic | UP NaukriGuru'
+      : ({
+        login: 'Student Sign In', register: 'Student Registration',
+        admin: 'Admin Console', result: 'Private Test Report',
+        review: 'Private Answer Review', results: 'Saved Report Cards',
+        profile: 'Student Profile', attempt: 'Test in Progress',
+        diagnostic: 'Free Diagnostic Test', tests: 'Practice Tests'
+      }[name] || 'Student Exam Preparation') + ' | UP NaukriGuru';
+    const pageDescription = isLanding
+      ? 'Prepare for UP Police Constable with free general reasoning diagnostics, topic-wise practice, timed mock tests and personalised performance reports on UP NaukriGuru.'
+      : 'Interactive student exam preparation and private account tools on UP NaukriGuru.';
+    document.title = pageTitle;
+    const descriptionEl = document.getElementById('siteDescription');
+    if (descriptionEl) descriptionEl.setAttribute('content', pageDescription);
+    const robotsEl = document.getElementById('pageRobots');
+    if (robotsEl) robotsEl.setAttribute('content', isLanding ? 'index,follow,max-image-preview:large' : 'noindex,nofollow');
+    document.querySelector('meta[property="og:title"]')?.setAttribute('content', pageTitle);
+    document.querySelector('meta[property="og:description"]')?.setAttribute('content', pageDescription);
+    document.querySelector('meta[name="twitter:title"]')?.setAttribute('content', pageTitle);
+    document.querySelector('meta[name="twitter:description"]')?.setAttribute('content', pageDescription);
+  }
+
   function route() {
     TestEngine.stop();
     closeModal();
@@ -240,6 +267,7 @@
       location.hash = '#/onboarding';
       return;
     }
+    updateRouteSeo(name);
     document.querySelectorAll('[data-nav]').forEach(link => link.classList.toggle('active', link.dataset.nav === (name === 'result' ? 'results' : name)));
     document.body.classList.toggle('focus-mode', name === 'attempt');
     document.body.classList.toggle('admin-mode', name === 'admin');

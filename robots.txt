@@ -1,3 +1,7 @@
 User-agent: *
 Allow: /
+Disallow: /flutter_app/
+Disallow: /.github/
+Disallow: /releases/
+
 Sitemap: https://naukripreps.com/sitemap.xml
