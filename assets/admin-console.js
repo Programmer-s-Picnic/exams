@@ -50,7 +50,7 @@
       if (dirty && !confirm('Discard your unsaved content changes?')) return;
       dirty = false;
       document.querySelectorAll('[data-panel]').forEach(b => b.classList.toggle('active', b.dataset.panel === name));
-      if (name === 'overview') workspace.innerHTML = `<h2>Portal overview</h2><div class="admin-metrics"><article><b>${state.exams.length}</b>Exams</article><article><b>${state.tests.length}</b>Test papers</article><article><b>${info.studentCount}</b>Registered students</article></div><h3>Content workflow</h3><p>Use Validation for syllabus and previous-paper records. Use Exam content for broader JSON updates. Changes are backed up before saving.</p>`;
+      if (name === 'overview') workspace.innerHTML = `<h2>Portal overview</h2><div class="admin-metrics"><article><b>${state.exams.length}</b>Exams</article><article><b>${state.tests.length}</b>Test papers</article><article><b>${info.studentCount}</b>Registered students</article></div><h3>Content workflow</h3><p>Use Validation for syllabus and previous-paper records. Use Exam content for visual form editing of supported JSON records. Server saves back up the previous published file.</p>`;
       if (name === 'validation') {
         workspace.innerHTML = '<p>Loading validation queue…</p>';
         try {
@@ -65,16 +65,18 @@
             try { result = await Api.auth('admin', {action:'validation-record', target:row.target, id:row.id}, token); }
             catch (error) { alert(error.message); return; }
             const record = result.record;
-            window.App.modal(`<div class="admin-record-editor"><span class="eyebrow">EDIT BEFORE VALIDATION</span><h2>${esc(row.title)}</h2><p>Edit this record, save it, then validate it separately. Saving always returns the record to <b>Pending</b>. For any test-enabled document or question set, edit the <code>questions</code> array. Approval publishes the same questions in the readable view and the test.</p><textarea class="admin-editor" id="validationRecordEditor" spellcheck="false">${esc(JSON.stringify(record,null,2))}</textarea><div class="admin-tools"><button class="ghost-button" id="checkValidationRecord">Validate JSON</button><button class="primary-button" id="saveValidationRecord">Save changes</button></div><p class="admin-status" id="validationRecordStatus">Record ID cannot be changed. Public source links must be government URLs or Wayback snapshots of original government URLs.</p></div>`);
+            window.App.modal(`<div class="admin-record-editor"><span class="eyebrow">EDIT BEFORE VALIDATION</span><h2>${esc(row.title)}</h2><p>Use the visual fields to edit this record. Saving returns it to <b>Pending</b>, and approval is a separate step.</p><div id="validationVisualEditor"></div><details id="validationAdvancedPane"><summary>Advanced JSON (technical administrators)</summary><textarea class="admin-editor" id="validationRecordEditor" spellcheck="false">${esc(JSON.stringify(record,null,2))}</textarea><button class="ghost-button" type="button" id="validationApplyJson">Apply JSON to form</button></details><div class="admin-tools"><button class="ghost-button" id="checkValidationRecord">Validate JSON</button><button class="primary-button" id="saveValidationRecord">Save changes</button></div><p class="admin-status" id="validationRecordStatus">Record ID cannot be changed. Public source links must be government URLs or Wayback snapshots of original government URLs.</p></div>`);
             const editor = document.getElementById('validationRecordEditor');
             const status = document.getElementById('validationRecordStatus');
+            const visual = window.ExamVisualEditor.mount(document.getElementById('validationVisualEditor'),record,value=>{editor.value=JSON.stringify(value,null,2);status.textContent='Unsaved form changes.';});
+            document.getElementById('validationApplyJson').onclick=()=>{try{visual.setValue(JSON.parse(editor.value));status.textContent='Advanced changes applied to form.';}catch(e){status.textContent=e.message;}};
             document.getElementById('checkValidationRecord').onclick = () => {
-              try { JSON.parse(editor.value); status.textContent = 'Valid JSON. Saving will reset validation to Pending.'; }
+              try { JSON.parse(JSON.stringify(visual.getValue())); status.textContent = 'Valid JSON. Saving will reset validation to Pending.'; }
               catch (error) { status.textContent = error.message; }
             };
             document.getElementById('saveValidationRecord').onclick = async event => {
               let edited;
-              try { edited = JSON.parse(editor.value); } catch (error) { status.textContent = error.message; return; }
+              try { edited = visual.getValue(); } catch (error) { status.textContent = error.message; return; }
               if (!confirm('Save these edits? The record will remain hidden from students until it is approved again.')) return;
               event.currentTarget.disabled = true;
               status.textContent = 'Saving…';
@@ -120,13 +122,38 @@
           renderQueue();
         } catch (e) { workspace.textContent = e.message; }
       }
-      if (name === 'guide') workspace.innerHTML = `<h2>How to use the admin website</h2><p>This workflow keeps unreviewed academic content away from students.</p><ol class="admin-guide"><li><b>Import or create content.</b> Syllabus and previous-paper records enter the system as Pending.</li><li><b>Open Validation.</b> Find the syllabus, document or question-set record you want to review.</li><li><b>Edit before approval.</b> Click Edit and update metadata, source links and the <code>questions</code> array. Set <code>testEnabled</code> to true when the question set should also be attemptable as a test. The record remains Pending after saving.</li><li><b>Check the source rule.</b> Public source links are allowed only for government documents or Wayback snapshots of original government URLs. Other data can be retained without showing a source.</li><li><b>Approve or reject.</b> Test-enabled records cannot be approved without a valid question set. Approved records become visible to students; rejected and pending records remain hidden.</li><li><b>Re-edit safely.</b> Editing an approved record automatically returns it to Pending and removes it from the student view until approved again.</li><li><b>Use Exam content for bulk changes.</b> Load and edit JSON when many records need changes. Any syllabus or previous-paper file saved there is reset to Pending for revalidation.</li><li><b>Validate JSON and keep IDs stable.</b> Do not change record IDs that other data refers to.</li><li><b>Check the student website.</b> After approval, sign in as a student, choose the exam and verify the published syllabus/paper information.</li><li><b>Review students separately.</b> The Students section lists registrations; passwords and session tokens are never displayed.</li></ol><h3>Recommended publishing sequence</h3><p><b>Import → Edit → Save → Pending → Review → Approve → Student visibility.</b></p><p>Server backups are created before content saves and validation changes.</p>`;
+      if (name === 'guide') workspace.innerHTML = `<h2>How to use ExamPreps Administration</h2>
+        <p>Use the visual editor to manage examination information without typing JSON. Only authorised administrators may access this section.</p>
+        <h3>1. Edit examination content using forms</h3>
+        <ol class="admin-guide">
+          <li>Open <b>Exam content</b> from the left menu.</li>
+          <li>Select a content file from the dropdown and click <b>Load file</b>. The file appears as labelled fields, groups and expandable records.</li>
+          <li>Click a record to open it. Change the relevant text or number. For question sets, edit the question, options, answer, explanation and exam/topic information.</li>
+          <li>Use <b>Duplicate</b> to start with a similar record or <b>Remove</b> to delete one from your unsaved copy. Review automatic IDs when duplicating records.</li>
+          <li>Use <b>Search</b> to locate text. Use <b>Download copy</b> to keep a personal JSON export before changes.</li>
+          <li>Click <b>Validate JSON</b> to check syntax, then <b>Save to server</b> and confirm. The server performs additional structural checks and creates a backup before replacing the file.</li>
+        </ol>
+        <p><strong>Important:</strong> Save to server is not a private draft. It writes to the existing content store. For syllabus and previous-paper records, saving resets approval to Pending; those records must be reapproved in Validation before students see them. Other allowed files may change the student-facing data immediately.</p>
+        <h3>2. Review syllabus and previous-year question sets</h3>
+        <ol class="admin-guide">
+          <li>Open <b>Validation</b>, locate the record and select <b>Edit</b>.</li>
+          <li>Use the visual form to correct record fields. For test-enabled papers, verify the full questions list and correct answers.</li>
+          <li>Save the changes. The record returns to <b>Pending</b>.</li>
+          <li>Check the source rule: public citations must link to a government site or a Wayback snapshot of an original government document. Material without such an official source must not be given an unsupported source link.</li>
+          <li>Choose <b>Approve</b> to make a validated record available to students, or <b>Reject</b> for corrections. Verify the result on the student website.</li>
+        </ol>
+        <h3>3. Technical and safety notes</h3>
+        <p>Open <b>Advanced JSON editor</b> only when you understand the data structure. If you change its text, click <b>Apply JSON changes to visual editor</b> before saving. Keep existing IDs unchanged because other records refer to them. Do not edit account data or report cards through the content editor.</p>
+        <p>Currently the content selector displays only the files explicitly permitted by the server. Excel/CSV import, MySQL editorial drafts and delegated subadmin publishing are not active in this release.</p>
+        <h3>4. Check your work</h3>
+        <p>After saving, revisit the file to confirm the updated values. After approving a paper, open the student site and confirm that the syllabus, paper display, test questions and answers behave correctly. The <b>Students</b> area is read-only for registrations and does not expose passwords or session tokens.</p>
+        <p><strong>Current workflow:</strong> Load → Edit → Check → Save → (if approval-required) Validate → Student preview.</p>`;
       if (name === 'students') {
         workspace.innerHTML = '<p>Loading students…</p>';
         try { const result = await Api.auth('admin', {action:'students'}, token); if (!workspace.isConnected) return; workspace.innerHTML = `<h2>Registered students</h2><p>Latest 200 registrations.</p><div style="overflow:auto"><table class="admin-table"><thead><tr><th>Name</th><th>Email</th><th>Mobile</th></tr></thead><tbody>${result.students.map(u=>`<tr><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${esc(u.mobile)}</td></tr>`).join('') || '<tr><td colspan="3">No registrations yet.</td></tr>'}</tbody></table></div>`; } catch (e) {workspace.textContent = e.message;}
       }
       if (name === 'content') {
-        workspace.innerHTML = `<h2>Published content</h2><label for="adminFile">Content file</label><div class="admin-tools"><select id="adminFile">${info.files.map(f=>`<option>${esc(f)}</option>`).join('')}</select><button class="ghost-button" id="loadContent">Load file</button></div><div id="visualEditorHost" aria-label="Visual content editor"></div><details id="advancedEditorPane"><summary>Advanced JSON editor (technical administrators only)</summary><p>Changes made in this technical view are reflected when you choose Apply JSON below.</p><textarea class="admin-editor" id="contentEditor" aria-label="JSON content" spellcheck="false" disabled></textarea><button type="button" class="ghost-button" id="applyAdvancedJSON" disabled>Apply JSON changes to visual editor</button></details><div class="admin-tools"><button id="validateContent" class="ghost-button" disabled>Validate JSON</button><button id="downloadContent" class="ghost-button" disabled>Download copy</button><button id="saveContent" class="primary-button" disabled>Save to server</button></div><p class="admin-status" id="adminStatus" role="status">Select a file and load it to begin.</p>`;
+        workspace.innerHTML = `<h2>Visual content editor</h2><p>Edit content using ordinary fields and expandable records. <strong>Save to server publishes the existing file</strong> (syllabus and previous-paper records return to Pending validation). Download a copy before major changes.</p><label for="adminFile">Content file</label><div class="admin-tools"><select id="adminFile">${info.files.map(f=>`<option>${esc(f)}</option>`).join('')}</select><button class="ghost-button" id="loadContent">Load file</button></div><div id="visualEditorHost" aria-label="Visual content editor"></div><details id="advancedEditorPane"><summary>Advanced JSON editor (technical administrators only)</summary><p>Changes made in this technical view are reflected when you choose Apply JSON below.</p><textarea class="admin-editor" id="contentEditor" aria-label="JSON content" spellcheck="false" disabled></textarea><button type="button" class="ghost-button" id="applyAdvancedJSON" disabled>Apply JSON changes to visual editor</button></details><div class="admin-tools"><button id="validateContent" class="ghost-button" disabled>Validate JSON</button><button id="downloadContent" class="ghost-button" disabled>Download copy</button><button id="saveContent" class="primary-button" disabled>Save to server</button></div><p class="admin-status" id="adminStatus" role="status">Select a file and load it to begin.</p>`;
         const editor = document.getElementById('contentEditor'), select = document.getElementById('adminFile'), status = document.getElementById('adminStatus'); let revision, loaded;
         let visual = null;
         const controls = ['validateContent','downloadContent','saveContent'].map(id=>document.getElementById(id));
