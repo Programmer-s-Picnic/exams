@@ -13,7 +13,7 @@
 - Existing load/save uses a file allowlist, revision hash and a private file backup before replacing published JSON.
 - The admin endpoint advertises site-main.json, exams.json, tests.json, exam-syllabus.json, exams-old-papers.json.
 - examsdata also exposes exams-topics-questions.json and exam-topics.json, but those are not currently part of the server admin file allowlist.
-- Existing Validation editor also uses a raw JSON textarea. It requires a separate conversion before launching to non-technical staff.
+- Existing Validation editor originally used raw JSON. This staging branch now uses a visual editor with an optional technical JSON view.
 
 ## Implemented in staging
 - Non-technical structured form editor, list management, search, duplication, removal and labelled fields.
@@ -26,7 +26,7 @@
 ## NOT yet implemented / activated
 - Draft API endpoints and per-user permissions; database migration has NOT run.
 - Review/publish transaction through MySQL; existing Save still publishes according to original backend rules.
-- Validation-queue form editor and full question-specific controls.
+- Full question-specific controls and guided MCQ answer selection (the generic visual form is currently used in both content and Validation).
 - Excel/CSV import preview and bulk publishing.
 - Student/Flutter cross-platform verification and production release.
 
@@ -35,9 +35,12 @@
 2. Build authenticated draft/save/review/publish endpoints and enforce server-side full-admin-only publishing.
 3. Migrate MySQL tables after a verified database snapshot, and provide rollback SQL/procedures.
 4. Add schema-specific validation for question sets, paper structures, bilingual options and index consistency.
-5. Refactor existing Validation record editor to the same visual editing component.
+5. Verify the Validation record visual editor with real paper and syllabus structures.
 6. CSV import: sanitization, mapping screen, duplicate report and dry run; no silent overwrite.
 7. Test keyboard interaction, Hindi input, nested arrays, large papers, concurrent edits and rejected revisions.
 8. Confirm student website and Flutter app still render every published paper and retain report cards.
 
 This branch is a development checkpoint, not a production deployment.
+
+## Publication update
+The existing frontend visual editor and its How to use guide may be published independently. The draft MySQL schema remains uninstalled, and old server-side Save continues to publish eligible JSON files directly. No subadmin or Excel-import functionality is implied by this frontend release.
