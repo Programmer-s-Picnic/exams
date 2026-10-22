@@ -18,7 +18,9 @@
         sessionStorage.setItem('he_admin_token', result.token);
         await window.AdminConsole.render(state, result.token);
       } catch (error) {
-        status.textContent = error.message;
+        status.textContent = login === 'admin' && /Temporary admin testing is unavailable/i.test(error.message)
+          ? 'Temporary admin testing has expired or is disabled. Sign in using your registered, authorised administrator email or mobile number and its password. The temporary password cannot be used for permanent login.'
+          : error.message;
         button.disabled = false;
       }
     };
