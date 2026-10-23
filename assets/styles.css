@@ -305,3 +305,13 @@ body.admin-mode .admin-shell-header {
 .guest-access-note strong{color:#b8ffe5;font-weight:850}
 .guest-access-note a{color:#9cfbd8;text-decoration:underline;text-underline-offset:3px;font-weight:750}
 .guest-access-note a:focus-visible{outline:3px solid #82f2ca;outline-offset:3px}
+
+/* Make completed approval obvious; reapproval is enabled after an edit is saved. */
+.admin-table button[data-decision="approved"]:disabled,
+.admin-table button[data-decision="approved"]:disabled:hover {
+  opacity:.45;
+  cursor:not-allowed;
+  box-shadow:none;
+  transform:none;
+  filter:grayscale(.45);
+}

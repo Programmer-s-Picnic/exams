@@ -99,7 +99,7 @@
             const pending = rows.filter(item => item.status === 'pending').length;
             const approved = rows.filter(item => item.status === 'approved').length;
             const rejected = rows.filter(item => item.status === 'rejected').length;
-            workspace.innerHTML = `<h2>Content validation</h2><p><b>Edit → Save → Validate.</b> Documents, question sets and syllabus records are published to students only after approval.</p><div class="admin-metrics"><article><b>${pending}</b>Pending</article><article><b>${approved}</b>Approved</article><article><b>${rejected}</b>Rejected</article></div><div style="overflow:auto"><table class="admin-table"><thead><tr><th>Type</th><th>Record</th><th>Status</th><th>Validated by</th><th>Actions</th></tr></thead><tbody>${rows.map(item => `<tr><td>${esc(item.kind)}</td><td><strong>${esc(item.title)}</strong><br><small>${esc(item.examId || '')}${item.examDate ? ' · '+esc(item.examDate) : ''}${item.shift ? ' · Shift '+esc(item.shift) : ''}${item.questionCount ? ' · '+esc(item.questionCount)+' questions' : ''}${item.testEnabled ? ' · test enabled' : ''}</small></td><td><b>${esc(item.status)}</b></td><td>${esc(item.validatedBy || '—')}</td><td><button class="ghost-button" data-edit-target="${esc(item.target)}" data-edit-id="${esc(item.id)}">Edit</button> <button class="ghost-button" data-validate-target="${esc(item.target)}" data-validate-id="${esc(item.id)}" data-decision="approved">Approve</button> <button class="ghost-button" data-validate-target="${esc(item.target)}" data-validate-id="${esc(item.id)}" data-decision="rejected">Reject</button></td></tr>`).join('') || '<tr><td colspan="5">Nothing to validate.</td></tr>'}</tbody></table></div><p class="admin-status">Editing an approved record returns it to Pending until it is approved again.</p>`;
+            workspace.innerHTML = `<h2>Content validation</h2><p><b>Edit → Save → Validate.</b> Documents, question sets and syllabus records are published to students only after approval.</p><div class="admin-metrics"><article><b>${pending}</b>Pending</article><article><b>${approved}</b>Approved</article><article><b>${rejected}</b>Rejected</article></div><div style="overflow:auto"><table class="admin-table"><thead><tr><th>Type</th><th>Record</th><th>Status</th><th>Validated by</th><th>Actions</th></tr></thead><tbody>${rows.map(item => `<tr><td>${esc(item.kind)}</td><td><strong>${esc(item.title)}</strong><br><small>${esc(item.examId || '')}${item.examDate ? ' · '+esc(item.examDate) : ''}${item.shift ? ' · Shift '+esc(item.shift) : ''}${item.questionCount ? ' · '+esc(item.questionCount)+' questions' : ''}${item.testEnabled ? ' · test enabled' : ''}</small></td><td><b>${esc(item.status)}</b></td><td>${esc(item.validatedBy || '—')}</td><td><button class="ghost-button" data-edit-target="${esc(item.target)}" data-edit-id="${esc(item.id)}">Edit</button> <button class="ghost-button" data-validate-target="${esc(item.target)}" data-validate-id="${esc(item.id)}" data-decision="approved" ${item.status === 'approved' ? 'disabled aria-disabled="true" title="Already approved. Edit and save this record to enable approval again."' : ''}>Approve</button> <button class="ghost-button" data-validate-target="${esc(item.target)}" data-validate-id="${esc(item.id)}" data-decision="rejected">Reject</button></td></tr>`).join('') || '<tr><td colspan="5">Nothing to validate.</td></tr>'}</tbody></table></div><p class="admin-status">Approved records cannot be approved twice. Edit and save an approved record to return it to Pending and enable Approve again.</p>`;
             workspace.querySelectorAll('[data-edit-target]').forEach(button => button.onclick = () => {
               const row = rows.find(item => item.target === button.dataset.editTarget && String(item.id) === String(button.dataset.editId));
               if (row) editRecord(row);
@@ -108,6 +108,9 @@
               const decision = button.dataset.decision;
               const target = button.dataset.validateTarget;
               const id = button.dataset.validateId;
+              // A saved edit resets server approval to Pending before reapproval.
+              const current = rows.find(item => item.target === target && String(item.id) === String(id));
+              if (decision === 'approved' && current?.status === 'approved') return;
               if (!confirm(`${decision === 'approved' ? 'Approve' : 'Reject'} this ${target} record for student publication?`)) return;
               button.disabled = true;
               try {
@@ -140,7 +143,7 @@
         <ol class="admin-guide">
           <li>Open <b>Validation</b>, locate the record and select <b>Edit</b>.</li>
           <li>Use the visual form to correct record fields. For test-enabled papers, verify the full questions list and correct answers.</li>
-          <li>Save the changes. The record returns to <b>Pending</b>.</li>
+          <li>Save the changes. The record returns to <b>Pending</b>. <b>Approve</b> is disabled on an Approved record and becomes available again only after edits are saved.</li>
           <li>Check the source rule: public citations must link to a government site or a Wayback snapshot of an original government document. Material without such an official source must not be given an unsupported source link.</li>
           <li>Choose <b>Approve</b> to make a validated record available to students, or <b>Reject</b> for corrections. Verify the result on the student website.</li>
         </ol>
