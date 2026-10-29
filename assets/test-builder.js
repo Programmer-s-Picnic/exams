@@ -247,7 +247,9 @@
         notice=error.message || 'Could not save. Your unsaved changes are still in this form.';
         const msg=workspace.querySelector('#tbNotice'); if(msg)msg.textContent=notice;
       } finally {
-        busy=false;if(button && button.isConnected)button.disabled=false;
+        busy=false;
+        const activeSave=workspace.querySelector('[data-action="save"]');
+        if(activeSave)activeSave.disabled=false;
       }
     }
     function download() {
