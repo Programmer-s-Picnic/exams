@@ -74,13 +74,16 @@
   const area = (title,key,value,hint) =>
     '<label class="tb-field tb-span"><span>'+esc(title)+'</span><textarea data-tfield="'+esc(key)+'" rows="3">'+esc(value)+'</textarea>'+(hint?'<small>'+esc(hint)+'</small>':'')+'</label>';
   function mount(workspace, cfg) {
-    const { Api, token, exams, onDirtyChange } = cfg;
+    const { Api, token, onDirtyChange } = cfg;
+    let exams=cfg.exams || [];
     let file=null, revision=null, test=null, selected='new', questionIndex=-1;
     let dirty=false, busy=false, notice='';
     const markDirty=() => {
       if (!dirty) { dirty=true; onDirtyChange(true); }
       const msg=workspace.querySelector('#tbNotice');
       if (msg) msg.textContent='Unsaved changes. Use Check test and Save to server when finished.';
+      checkList();
+      refreshPreview();
     };
     const recalc=() => {
       if (!test) return;
@@ -95,6 +98,16 @@
     const allowed = t => t && !(t.audience==='guest');
     const allTests=()=>file.tests.filter(allowed);
     const question=()=>test && test.questions[questionIndex];
+    function refreshPreview() {
+      const q=question(), box=workspace.querySelector('.tb-preview');
+      if (!q || !box) return;
+      const prompt=box.querySelector('p');
+      if (prompt) prompt.textContent=q.question || 'Start by entering the question above.';
+      box.querySelectorAll('ol li').forEach((li,i)=>{
+        li.textContent=q.options[i] || 'Choice '+letters[i];
+        li.classList.toggle('tb-preview-correct',i===q.correctOption);
+      });
+    }
     const checkList=()=>{
       const problems=validate(test);
       const box=workspace.querySelector('#tbChecklist');
