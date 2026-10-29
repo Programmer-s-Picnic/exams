@@ -165,7 +165,7 @@
        field('Time limit (minutes)','duration',Math.round(positive(test.timing.totalSeconds,900)/60),'15','type="number" min="1" step="1"')+
        field('Marks deducted for a wrong answer','penalty',test.negativeMarking,'0 for no negative marking','type="number" min="0" step="0.25"')+
        field('Pass percentage','passPercent',test.passPercent,'40','type="number" min="0" max="100" step="1"')+
-       '<label class="tb-field"><span>Visibility</span><label class="tb-toggle"><input type="checkbox" data-tfield="available" '+(test.available===true?'checked':'')+'><span>Make this test available to students after saving</span></label><small>Leave off while entering or checking questions. Saving an available test updates the live student site.</small></label>'+
+       '<div class="tb-field"><span>Visibility</span><label class="tb-toggle"><input type="checkbox" data-tfield="available" '+(test.available===true?'checked':'')+'><span>Make this test available to students after saving</span></label><small>Leave off while entering or checking questions. Saving an available test updates the live student site.</small></div>'+
        '</div></section>'+
        '<section class="tb-section"><div class="tb-question-heading"><div><h3>3. Questions</h3><p>Enter each question, four answers, and select the correct answer. All answer keys stay editable.</p></div><button type="button" class="primary-button" data-action="add-question">+ Add question</button></div>'+
        '<div class="tb-question-layout"><div class="tb-question-list" aria-label="Questions in this test">'+(items||'<p>No questions yet</p>')+'</div>'+qArea+'</div></section>'+
