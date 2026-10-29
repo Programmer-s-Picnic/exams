@@ -40,7 +40,7 @@
     const problems=[];
     if (!test.title || !test.title.trim()) problems.push('Give the test a title.');
     if (!Array.isArray(test.examIds) || !test.examIds.length) problems.push('Select at least one examination.');
-    if (test.type==='diagnostic' && test.examIds.length !== 1)
+    if (test.type==='diagnostic' && (!Array.isArray(test.examIds) || test.examIds.length !== 1))
       problems.push('For a logged-in diagnostic, select exactly one examination so results are linked to the right exam.');
     if (!Number.isFinite(test.timing && test.timing.totalSeconds) || test.timing.totalSeconds < 60)
       problems.push('Set the total duration to at least 1 minute.');
