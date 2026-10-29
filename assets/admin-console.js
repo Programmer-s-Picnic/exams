@@ -37,7 +37,7 @@
       return;
     }
     if (location.hash !== '#/admin') return;
-    mount.innerHTML = `<section class="admin-standalone"><header class="admin-shell-header"><div><img src="favicon.svg?v=upnaukriguru" alt="" width="48" height="48"><span><strong>UP NaukriGuru Administration</strong><small>Content, validation and student management</small></span></div><div><a class="ghost-button" href="#/landing">Open student site</a><button class="ghost-button" id="adminSignOut" type="button">Sign out</button></div></header><div class="page admin-page"><div class="page-hero compact"><span class="eyebrow">ADMINISTRATION</span><h1>Administration dashboard</h1><p>Manage exam content, validations and student registrations.</p></div><div class="admin-console"><aside class="admin-menu"><button data-panel="overview" class="active">Overview</button><button data-panel="validation">Validation</button><button data-panel="content">Exam content</button><button data-panel="students">Students</button><button data-panel="guide">How to use</button></aside><article class="admin-workspace" id="adminWorkspace"></article></div></div><footer class="admin-product-footer">Developed and maintained by <strong>Champak Roy</strong></footer></section>`;
+    mount.innerHTML = `<section class="admin-standalone"><header class="admin-shell-header"><div><img src="favicon.svg?v=upnaukriguru" alt="" width="48" height="48"><span><strong>UP NaukriGuru Administration</strong><small>Content, validation and student management</small></span></div><div><a class="ghost-button" href="#/landing">Open student site</a><button class="ghost-button" id="adminSignOut" type="button">Sign out</button></div></header><div class="page admin-page"><div class="page-hero compact"><span class="eyebrow">ADMINISTRATION</span><h1>Administration dashboard</h1><p>Manage exam content, validations and student registrations.</p></div><div class="admin-console"><aside class="admin-menu"><button data-panel="overview" class="active">Overview</button><button data-panel="validation">Validation</button><button data-panel="builder">Test builder</button><button data-panel="content">Exam content</button><button data-panel="students">Students</button><button data-panel="guide">How to use</button></aside><article class="admin-workspace" id="adminWorkspace"></article></div></div><footer class="admin-product-footer">Developed and maintained by <strong>Champak Roy</strong></footer></section>`;
     document.getElementById('adminSignOut').onclick = async () => {
       if (info.testing) {
         try { await Api.auth('admin', {action:'temporary-logout'}, token); } catch (_) {}
@@ -52,7 +52,18 @@
       if (dirty && !confirm('Discard your unsaved content changes?')) return;
       dirty = false;
       document.querySelectorAll('[data-panel]').forEach(b => b.classList.toggle('active', b.dataset.panel === name));
-      if (name === 'overview') workspace.innerHTML = `<h2>Portal overview</h2><div class="admin-metrics"><article><b>${state.exams.length}</b>Exams</article><article><b>${state.tests.length}</b>Test papers</article><article><b>${info.studentCount}</b>Registered students</article></div><h3>Content workflow</h3><p>Use Validation for syllabus and previous-paper records. Use Exam content for visual form editing of supported JSON records. Server saves back up the previous published file.</p>`;
+      if (name === 'overview') workspace.innerHTML = `<h2>Portal overview</h2><div class="admin-metrics"><article><b>${state.exams.length}</b>Exams</article><article><b>${state.tests.length}</b>Test papers</article><article><b>${info.studentCount}</b>Registered students</article></div><h3>Content workflow</h3><p>Use <b>Test builder</b> for new practice tests, diagnostics and multiple-choice questions—no JSON required. Use <b>Validation</b> for syllabus and previous-paper approvals. Use <b>Exam content</b> for technical editing of other records. The server backs up content before saving.</p>`;
+      if (name === 'builder') {
+        workspace.innerHTML = '<div id="testBuilderMount"></div>';
+        if (!window.ExamTestBuilder) {
+          workspace.innerHTML = '<h2>Test builder unavailable</h2><p>Refresh this page to load the guided editor.</p>';
+          return;
+        }
+        await window.ExamTestBuilder.mount(workspace.querySelector('#testBuilderMount'), {
+          Api, token, exams: state.exams,
+          onDirtyChange(value) { dirty = value; }
+        });
+      }
       if (name === 'validation') {
         workspace.innerHTML = '<p>Loading validation queue…</p>';
         try {
@@ -128,9 +139,39 @@
           renderQueue();
         } catch (e) { workspace.textContent = e.message; }
       }
-      if (name === 'guide') workspace.innerHTML = `<h2>How to use ExamPreps Administration</h2>
+      if (name === 'guide') workspace.innerHTML = `<h2>How to use NaukriPreps Administration</h2>
+        <p><strong>For most new tests, use Test builder.</strong> It has ordinary forms. You do not need to know JSON, question IDs or answer numbers.</p>
+        <h3>1. Create a new practice or mock test</h3>
+        <ol class="admin-guide">
+          <li>Open <b>Test builder</b> in the admin menu, then choose <b>+ New test</b>.</li>
+          <li>Enter a clear name such as <b>UP Police Constable — Reasoning Practice 1</b>, a subject/category and a short description.</li>
+          <li>Choose <b>Practice / Mock Test</b>. Select <b>Logged-in Diagnostic</b> only if this should be a diagnostic for registered students. The existing free guest diagnostic is kept separate.</li>
+          <li>Tick the examination(s) where the test belongs. Enter the time limit in <b>minutes</b>, marks deducted for a wrong answer (enter 0 for none), and the pass percentage.</li>
+          <li>Leave <b>Make this test available to students</b> <b>OFF</b> while preparing it.</li>
+        </ol>
+        <h3>2. Enter questions one at a time</h3>
+        <ol class="admin-guide">
+          <li>Click <b>+ Add question</b>. Type the question and its topic. Enter how many marks a correct answer earns.</li>
+          <li>Fill in the four answer choices marked <b>A, B, C and D</b>.</li>
+          <li>Click the round selector beside the <b>correct answer</b>. You do not enter numbers such as 0 or 1; the website handles answer numbering.</li>
+          <li>Add an <b>Explanation</b> for the student answer review. A programming question can optionally include a code snippet.</li>
+          <li>Check the <b>Student preview</b>. The correct choice is highlighted <b>only in the admin preview</b>.</li>
+          <li>Choose <b>+ Add question</b> again, or <b>Duplicate</b> a similar question and change its text, options and correct answer. Use <b>Move up</b> and <b>Move down</b> to change order, or <b>Delete</b> to remove a question.</li>
+        </ol>
+        <p><b>Example:</b> Question: What is 5 + 3? Options: A = 6, B = 7, C = 8, D = 9. Select the correct-answer circle beside <b>C</b>. Explanation: 5 + 3 = 8.</p>
+        <h3>3. Check your test and save</h3>
+        <ol class="admin-guide">
+          <li>Choose <b>Check test</b>. Fix any missing test title, exam, question text, topic, choice, correct answer or marks.</li>
+          <li>Choose <b>Save to server</b>. The server checks the latest file version and saves a backup. <b>Saving is not a private editorial draft:</b> it updates tests.json on the server.</li>
+          <li>If Visibility was OFF, the test cannot be taken by students (some screens may show it as Coming soon). When the test is completely reviewed, switch Visibility ON and <b>Save to server again</b>.</li>
+          <li>Reload the student website and confirm the right exam, every question, correct-answer feedback, timing and final score.</li>
+        </ol>
+        <p><b>To correct a test later:</b> open Test builder, select it from the list, fix the details or questions and save. Previously existing internal test and question IDs are preserved.</p>
+        <h3>4. Separate workflow for old papers and syllabuses</h3>
+        <p>The Test builder is for practice tests and logged-in diagnostics. Previous-year papers, uploaded documents and syllabus records use <b>Validation → Edit → Save → Approve</b>. An edited approved record returns to Pending until approved again.</p>
+        <h3>5. Advanced content editing</h3>
         <p>Use the visual editor to manage examination information without typing JSON. Only authorised administrators may access this section.</p>
-        <h3>1. Edit examination content using forms</h3>
+        <h4>Editing other JSON-backed content</h4>
         <ol class="admin-guide">
           <li>Open <b>Exam content</b> from the left menu.</li>
           <li>Select a content file from the dropdown and click <b>Load file</b>. The file appears as labelled fields, groups and expandable records.</li>
@@ -140,7 +181,7 @@
           <li>Click <b>Validate JSON</b> to check syntax, then <b>Save to server</b> and confirm. The server performs additional structural checks and creates a backup before replacing the file.</li>
         </ol>
         <p><strong>Important:</strong> Save to server is not a private draft. It writes to the existing content store. For syllabus and previous-paper records, saving resets approval to Pending; those records must be reapproved in Validation before students see them. Other allowed files may change the student-facing data immediately.</p>
-        <h3>2. Review syllabus and previous-year question sets</h3>
+        <h3>6. Review syllabus and previous-year question sets</h3>
         <ol class="admin-guide">
           <li>Open <b>Validation</b>, locate the record and select <b>Edit</b>.</li>
           <li>Use the visual form to correct record fields. For test-enabled papers, verify the full questions list and correct answers.</li>
@@ -148,10 +189,10 @@
           <li>Check the source rule: public citations must link to a government site or a Wayback snapshot of an original government document. Material without such an official source must not be given an unsupported source link.</li>
           <li>Choose <b>Approve</b> to make a validated record available to students, or <b>Reject</b> for corrections. Verify the result on the student website.</li>
         </ol>
-        <h3>3. Technical and safety notes</h3>
+        <h3>7. Technical and safety notes</h3>
         <p>Open <b>Advanced JSON editor</b> only when you understand the data structure. If you change its text, click <b>Apply JSON changes to visual editor</b> before saving. Keep existing IDs unchanged because other records refer to them. Do not edit account data or report cards through the content editor.</p>
         <p>Currently the content selector displays only the files explicitly permitted by the server. Excel/CSV import, MySQL editorial drafts and delegated subadmin publishing are not active in this release.</p>
-        <h3>4. Check your work</h3>
+        <h3>8. Check your work</h3>
         <p>After saving, revisit the file to confirm the updated values. After approving a paper, open the student site and confirm that the syllabus, paper display, test questions and answers behave correctly. The <b>Students</b> area is read-only for registrations and does not expose passwords or session tokens.</p>
         <p><strong>Current workflow:</strong> Load → Edit → Check → Save → (if approval-required) Validate → Student preview.</p>`;
       if (name === 'students') {
