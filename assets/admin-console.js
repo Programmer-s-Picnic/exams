@@ -181,7 +181,7 @@
           <li>Click <b>Validate JSON</b> to check syntax, then <b>Save to server</b> and confirm. The server performs additional structural checks and creates a backup before replacing the file.</li>
         </ol>
         <p><strong>Important:</strong> Save to server is not a private draft. It writes to the existing content store. For syllabus and previous-paper records, saving resets approval to Pending; those records must be reapproved in Validation before students see them. Other allowed files may change the student-facing data immediately.</p>
-        <h3>2. Review syllabus and previous-year question sets</h3>
+        <h3>6. Review syllabus and previous-year question sets</h3>
         <ol class="admin-guide">
           <li>Open <b>Validation</b>, locate the record and select <b>Edit</b>.</li>
           <li>Use the visual form to correct record fields. For test-enabled papers, verify the full questions list and correct answers.</li>
@@ -189,10 +189,10 @@
           <li>Check the source rule: public citations must link to a government site or a Wayback snapshot of an original government document. Material without such an official source must not be given an unsupported source link.</li>
           <li>Choose <b>Approve</b> to make a validated record available to students, or <b>Reject</b> for corrections. Verify the result on the student website.</li>
         </ol>
-        <h3>3. Technical and safety notes</h3>
+        <h3>7. Technical and safety notes</h3>
         <p>Open <b>Advanced JSON editor</b> only when you understand the data structure. If you change its text, click <b>Apply JSON changes to visual editor</b> before saving. Keep existing IDs unchanged because other records refer to them. Do not edit account data or report cards through the content editor.</p>
         <p>Currently the content selector displays only the files explicitly permitted by the server. Excel/CSV import, MySQL editorial drafts and delegated subadmin publishing are not active in this release.</p>
-        <h3>4. Check your work</h3>
+        <h3>8. Check your work</h3>
         <p>After saving, revisit the file to confirm the updated values. After approving a paper, open the student site and confirm that the syllabus, paper display, test questions and answers behave correctly. The <b>Students</b> area is read-only for registrations and does not expose passwords or session tokens.</p>
         <p><strong>Current workflow:</strong> Load → Edit → Check → Save → (if approval-required) Validate → Student preview.</p>`;
       if (name === 'students') {
