@@ -40,6 +40,8 @@
     const problems=[];
     if (!test.title || !test.title.trim()) problems.push('Give the test a title.');
     if (!Array.isArray(test.examIds) || !test.examIds.length) problems.push('Select at least one examination.');
+    if (test.type==='diagnostic' && test.examIds.length !== 1)
+      problems.push('For a logged-in diagnostic, select exactly one examination so results are linked to the right exam.');
     if (!Number.isFinite(test.timing && test.timing.totalSeconds) || test.timing.totalSeconds < 60)
       problems.push('Set the total duration to at least 1 minute.');
     if (!Number.isFinite(test.passPercent) || test.passPercent < 0 || test.passPercent > 100)
@@ -141,7 +143,7 @@
          '<label class="tb-field"><span>Marks for correct answer</span><input data-qfield="marks" type="number" min="0.1" step="0.25" value="'+esc(q.marks)+'"></label>'+
         '</div>'+
         '<div class="tb-choice-heading"><h4>Answer choices</h4><p>Enter all four choices, then select the circle beside the <b>correct</b> one. You do not need to enter answer numbers.</p></div>'+
-        '<div class="tb-options">'+letters.map((letter,i)=>'<label class="tb-option'+(q.correctOption===i?' correct':'')+'"><input type="radio" name="tbCorrectAnswer" data-correct="'+i+'" '+(q.correctOption===i?'checked':'')+' aria-label="Mark answer '+letter+' correct"><strong>'+letter+'</strong><input type="text" data-option="'+i+'" value="'+esc(q.options[i]||'')+'" placeholder="Choice '+letter+'"></label>').join('')+'</div>'+
+        '<div class="tb-options">'+letters.map((letter,i)=>'<div class="tb-option'+(q.correctOption===i?' correct':'')+'"><input type="radio" name="tbCorrectAnswer" data-correct="'+i+'" '+(q.correctOption===i?'checked':'')+' aria-label="Mark answer '+letter+' correct"><strong>'+letter+'</strong><input type="text" data-option="'+i+'" value="'+esc(q.options[i]||'')+'" aria-label="Answer choice '+letter+'" placeholder="Choice '+letter+'"></div>').join('')+'</div>'+
         '<label class="tb-field"><span>Explanation (shown in answer review)</span><textarea data-qfield="explanation" rows="2" placeholder="Why is the selected option correct?">'+esc(q.explanation||'')+'</textarea></label>'+
         '<details class="tb-extra"><summary>Optional: Code snippet for a programming question</summary><label class="tb-field"><span>Code shown with the question</span><textarea data-qfield="code" rows="3" placeholder="Optional program text">'+esc(q.code||'')+'</textarea></label></details>'+
         '<div class="tb-preview"><strong>Student preview</strong><p>'+esc(q.question||'Start by entering the question above.')+'</p><ol type="A">'+q.options.map((o,i)=>'<li'+(i===q.correctOption?' class="tb-preview-correct"':'')+'>'+esc(o||'Choice '+letters[i])+'</li>').join('')+'</ol><small>Correct choice is highlighted here only for administrators.</small></div>'+
