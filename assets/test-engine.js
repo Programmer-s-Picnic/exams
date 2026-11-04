@@ -147,8 +147,10 @@
     state.test = diagnostic && currentUserId !== null ? { ...test, questions: preparedQuestions } : test;
     state.markingMode = diagnostic ? 'default' : saved?.markingMode || settings.markingMode || 'default';
     state.marking = diagnostic ? { ...test.marking } : saved?.marking || settings.marking || test.marking || { correct: null, incorrect: -Number(test.negativeMarking || 0), unanswered: 0 };
-    state.mode = diagnostic ? 'total-timed' : settings.mode || test.defaultMode || 'total-timed';
-    state.feedbackMode = diagnostic ? 'on-completion' : settings.feedbackMode || test.feedbackMode || 'on-completion';
+    // A resumed attempt must retain its original timing and feedback rules.
+    // New settings cannot reset or change an examination during a reload.
+    state.mode = diagnostic ? 'total-timed' : saved?.mode || settings.mode || test.defaultMode || 'total-timed';
+    state.feedbackMode = diagnostic ? 'on-completion' : saved?.feedbackMode || settings.feedbackMode || test.feedbackMode || 'on-completion';
     state.sound = settings.sound !== false;
     state.current = saved?.current || 0;
     state.answers = saved?.answers || Array(test.questions.length).fill(null);
