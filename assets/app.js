@@ -164,8 +164,10 @@
       if (!state.preferences.selected.includes(state.preferences.primary)) state.preferences.primary = available && state.preferences.selected.includes(available) ? available : null;
       applyBranding();
       bindShell();
+      restoreReloadRoute();
       route();
       window.addEventListener('hashchange', route);
+      window.addEventListener('pagehide', rememberRoute);
     } catch (error) {
       document.getElementById('app').innerHTML = `<section class="error-state"><div class="empty-icon">!</div><h1>We could not load the application</h1><p>Please try again in a moment.</p><button class="primary-button" onclick="location.reload()">Try again</button></section>`;
     }
@@ -218,6 +220,29 @@
     document.getElementById('publicNav').hidden = loggedIn;
   }
 
+  // Preserve an explicit in-app route across browser reloads. Hash routes normally
+  // survive a refresh; session storage is a fallback when a browser/webview drops it.
+  // Restore only on a real reload, never on a fresh visit to the home URL.
+  const LAST_ROUTE_KEY = 'he_last_route_v1';
+  function rememberRoute() {
+    const hash = window.location.hash;
+    if (!/^#\/[a-z][a-z0-9-]*(?:\/[^?#]*)?(?:\?.*)?$/i.test(hash)) return;
+    // Guest report cards are intentionally ephemeral and must not be restored.
+    if (!state.user && /^#\/(result|review|attempt)(?:\/|$)/.test(hash)) return;
+    try { sessionStorage.setItem(LAST_ROUTE_KEY, hash); } catch (_) {}
+  }
+  function restoreReloadRoute() {
+    if (window.location.hash) return;
+    const navigation = performance.getEntriesByType?.('navigation')?.[0];
+    if (navigation?.type !== 'reload') return;
+    let saved = '';
+    try { saved = sessionStorage.getItem(LAST_ROUTE_KEY) || ''; } catch (_) {}
+    if (!/^#\/[a-z][a-z0-9-]*(?:\/[^?#]*)?(?:\?.*)?$/i.test(saved)) return;
+    // Never resurrect a guest attempt or an expired transient result.
+    if (!state.user && /^#\/(result|review|attempt)(?:\/|$)/.test(saved)) return;
+    history.replaceState(history.state, '', location.pathname + location.search + saved);
+  }
+
   function currentRoute() {
     const parts = (location.hash.replace(/^#\//, '') || (state.user ? 'home' : 'landing')).split('/');
     return { name: parts[0], id: parts[1] };
@@ -251,6 +276,7 @@
   }
 
   function route() {
+    rememberRoute();
     TestEngine.stop();
     closeModal();
     const { name, id } = currentRoute();
