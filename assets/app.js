@@ -891,6 +891,7 @@
     if (!exam || !syllabus) return notFound('Constable information is unavailable');
 
     const syllabusApproved = syllabus.adminValidation?.status === 'approved';
+    const pendingPaperCount = state.papers.filter(item => item.examId === exam.id && item.adminValidation?.status !== 'approved').length;
     const papers = state.papers
       .filter(item => item.examId === exam.id && item.adminValidation?.status === 'approved')
       .sort((a, b) => String(b.examDate || '').localeCompare(String(a.examDate || '')) || Number(a.shift || 0) - Number(b.shift || 0));
@@ -966,7 +967,7 @@
 
         <section class="hub-section" id="constable-papers">
           <h2>Previous question papers</h2>
-          <p>${papers.length ? `${papers.length} shift-wise paper records are available.` : 'Previous papers will be available shortly.'}</p>
+          <p>${papers.length ? `${papers.length} administrator-approved shift-wise papers are available.` : 'No previous-year paper is approved for student publication yet.'} ${pendingPaperCount ? `${pendingPaperCount} imported shift records remain pending administrator review. Their questions are not shown until approved.` : ''}</p>
           ${paperGroups}
 
         </section>
