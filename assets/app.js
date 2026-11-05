@@ -896,6 +896,7 @@
       .sort((a, b) => String(b.examDate || '').localeCompare(String(a.examDate || '')) || Number(a.shift || 0) - Number(b.shift || 0));
     const paperYears = [...new Set(papers.map(item => item.year))].sort((a, b) => Number(b) - Number(a));
     const tests = state.tests.filter(test => test.id.startsWith('up-police-constable-') && !test.baseTestId);
+    const pattern = exam.officialPattern || {};
     const results = TestEngine.getResults().filter(result => tests.some(test => test.id === (result.baseTestId || result.testId)));
     const latest = results[0];
     const weak = latest && Object.entries(latest.topicScores || {}).sort((a, b) => a[1].correct / a[1].total - b[1].correct / b[1].total)[0]?.[0];
@@ -924,10 +925,12 @@
       <section class="page constable-hub">
         <a class="back-link" href="#/home">← Dashboard</a>
         <div class="page-hero"><span class="eyebrow">YOUR EXAM</span><h1>${escapeHtml(exam.name)}</h1><p>${escapeHtml(exam.description)}</p></div>
-        <nav class="hub-nav" aria-label="Constable sections">${[['overview','Overview'],['howto','How to use'],['syllabus','Syllabus'],['papers','Previous papers'],['practice','Practice'],['settings','Test modes'],['results','Results'],['stages','Stages']].map(([id,label]) => `<button type="button" data-hub-section="constable-${id}">${label}</button>`).join('')}</nav>
+        <nav class="hub-nav" aria-label="Constable sections">${[['overview','Overview'],['howto','How to use'],['syllabus','Syllabus'],['papers','Previous papers'],['practice','Practice'],['study','8-week plan'],['physical','Physical'],['settings','Test modes'],['results','Results'],['stages','Stages']].map(([id,label]) => `<button type="button" data-hub-section="constable-${id}">${label}</button>`).join('')}</nav>
 
         <section class="hub-section" id="constable-overview">
           <h2>Exam overview and official documents</h2>
+          <div class="hub-grid"><article class="hub-tile"><small>OFFICIAL WRITTEN PAPER</small><h3>150 questions · 300 marks</h3><p>Four subjects, +2 per correct answer</p></article><article class="hub-tile"><small>DURATION</small><h3>120 minutes</h3><p>Offline pen-and-paper / OMR examination</p></article><article class="hub-tile"><small>NEGATIVE MARKING</small><h3>Not specified</h3><p>The official February 2026 process notice gives +2 per correct answer but does not specify a wrong-answer deduction. Our practice mocks simulate zero deduction.</p></article><article class="hub-tile"><small>SECTION DISTRIBUTION</small><h3>Not officially fixed</h3><p>The 38/37/38/37 split in our original mock papers is an editorial choice.</p></article></div>
+          <div class="result-actions"><a class="primary-button" href="#/topic-practice">Practise 32 topics →</a><a class="ghost-button" href="#/exam-practice/up-police">Full-length original mocks →</a></div>
           <p>Read the current notification and examination-process notice before relying on recruitment dates, eligibility or scoring rules. Select a document to view it below.</p>
           <div class="hub-grid">${exam.sources.map((source, index) => `<div class="hub-tile"><strong>${escapeHtml(source.label)}</strong><div class="document-actions"><button class="ghost-button" type="button" data-document="${index}">View here</button><a class="ghost-button" href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">Open original ↗</a></div></div>`).join('')}</div>
           <div id="officialDocument" class="document-frame" hidden><div class="document-heading"><strong id="documentTitle"></strong><a id="documentOriginal" href="#" target="_blank" rel="noopener noreferrer">Open original ↗</a></div><iframe id="documentIframe" title="Official Constable document" loading="lazy" referrerpolicy="no-referrer"></iframe><p>Preview unavailable? Use “Open original” above. Official websites can prevent embedding.</p></div>
@@ -953,7 +956,7 @@
             <div class="hub-grid">
               <article class="hub-tile"><small>PAPER SIZE</small><h3>${escapeHtml(syllabus.totalQuestions || 150)} questions</h3><p>${escapeHtml(syllabus.totalMarks || 300)} maximum marks</p></article>
               <article class="hub-tile"><small>DURATION</small><h3>${escapeHtml(syllabus.durationMinutes || 120)} minutes</h3><p>Objective written examination</p></article>
-              <article class="hub-tile"><small>SCORING</small><h3>+${escapeHtml(syllabus.marksPerCorrect || 2)} correct</h3><p>${syllabus.negativeMarking ? 'Negative marking applies' : 'No negative marking'}</p></article>
+              <article class="hub-tile"><small>SCORING</small><h3>+${escapeHtml(syllabus.marksPerCorrect || 2)} correct</h3><p>Wrong-answer deduction not specified in the 2025 written-examination notice.</p></article>
               <article class="hub-tile"><small>SOURCE</small><h3>UPPRPB official notification</h3><p>Appendix 1 · pages ${escapeHtml((syllabus.sourcePages || []).join('–'))}</p><a class="ghost-button" href="${escapeHtml(syllabus.source)}" target="_blank" rel="noopener noreferrer">Open government source ↗</a></article>
             </div>
             <div class="hub-grid">${syllabus.sections.map(section => `<article class="hub-tile"><h3>${escapeHtml(section.name)}</h3><ul>${section.topics.map(topic => `<li>${escapeHtml(topic)}</li>`).join('')}</ul></article>`).join('')}</div>
@@ -967,7 +970,7 @@
 
         </section>
 
-        <section class="hub-section" id="constable-practice"><h2>Practice and mock tests</h2><p>Use subject practice and mock tests to strengthen preparation and review performance.</p><div class="test-list">${tests.map(test => testCard(test, results)).join('') || '<p>No practice tests are available yet.</p>'}</div></section>
+        <section class="hub-section" id="constable-practice"><h2>Practice and mock tests</h2><p>Choose immediate-feedback topic practice or original full-length 150-question, 120-minute mocks. Our mock papers are not official UPPRPB papers; their subject split is editorial.</p><div class="result-actions"><a class="primary-button" href="#/topic-practice">Topic-wise practice →</a></div><div class="test-list">${tests.map(test => testCard(test, results)).join('') || '<p>No practice tests are available yet.</p>'}</div></section>
         <section class="hub-section" id="constable-settings"><h2>Choose your test mode</h2><p>Each test lets you choose a whole-test timer, a per-question timer or untimed practice. Check answers after each question or only after submission.</p><a class="primary-button" href="#/tests">Browse test settings →</a></section>
         <section class="hub-section" id="constable-results"><h2>Results and retakes</h2><p>${latest ? `${results.length} attempt${results.length === 1 ? '' : 's'} · latest score ${latest.percent}%. ${weak ? `Suggested next focus: ${escapeHtml(weak)}.` : ''}` : 'Complete a practice test to see your score, explanations and topic analysis.'}</p>${latest ? `<a class="primary-button" href="#/result/${latest.id}">Review latest result →</a>` : '<a class="primary-button" href="#/tests">Start practising →</a>'}<p>On the result page, retake unanswered, unanswered and wrong, wrong only, or all questions with fresh shuffles.</p></section>
         <section class="hub-section" id="constable-stages"><h2>Recruitment stages</h2><div class="hub-grid">${exam.stages.map((stage, index) => `<article class="hub-tile"><small>STAGE ${index + 1}</small><h3>${escapeHtml(stage.name)}</h3><p>${escapeHtml(stage.description)}</p></article>`).join('')}</div><p>For current criteria and schedules, use the official links above.</p></section>
