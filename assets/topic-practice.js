@@ -21,7 +21,7 @@
   function bank(app, examId) {
     const rows = [];
     app.tests.filter(t => t.available === true &&
-      t.audience !== 'guest' && t.type !== 'diagnostic' &&
+      t.audience !== 'guest' && t.type !== 'diagnostic' && !t.fullMock &&
       !/diagnostic/i.test(String(t.category || '') + ' ' + String(t.title || '')) &&
       Array.isArray(t.examIds) && t.examIds.includes(examId)
     ).forEach(t => (t.questions || []).forEach(q => {
