@@ -164,7 +164,7 @@ const R=[];
   const answer=y*a/b;R.push(numeric('A:B = '+a+':'+b+' और B = '+y+' है। A का मान ज्ञात करें।',answer,
     'A = B × '+a+'/'+b+' = '+y+' × '+a+'/'+b+' = '+answer+'।'));
 });
-[[2,3,4,5,100],[3,4,5,6,90],[4,5,3,7,105],[5,6,7,8,96],[2,7,3,5,70]].forEach(([a,b,c,d,totalC])=>{
+[[2,3,4,5,75],[3,4,5,6,96],[4,5,3,7,105],[5,6,7,8,96],[2,7,3,5,70]].forEach(([a,b,c,d,totalC])=>{
   // A:B = a:b; B:C=c:d; C is known.
   // A = totalC*(c/d)*(a/b).
   const answer=totalC*c*a/(d*b);
