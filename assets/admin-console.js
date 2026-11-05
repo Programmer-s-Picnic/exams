@@ -37,7 +37,7 @@
       return;
     }
     if (location.hash !== '#/admin') return;
-    mount.innerHTML = `<section class="admin-standalone"><header class="admin-shell-header"><div><img src="favicon.svg?v=upnaukriguru" alt="" width="48" height="48"><span><strong>UP NaukriGuru Administration</strong><small>Content, validation and student management</small></span></div><div><a class="ghost-button" href="#/landing">Open student site</a><button class="ghost-button" id="adminSignOut" type="button">Sign out</button></div></header><div class="page admin-page"><div class="page-hero compact"><span class="eyebrow">ADMINISTRATION</span><h1>Administration dashboard</h1><p>Manage exam content, validations and student registrations.</p></div><div class="admin-console"><aside class="admin-menu"><button data-panel="overview" class="active">Overview</button><button data-panel="validation">Validation</button><button data-panel="builder">Test builder</button><button data-panel="content">Exam content</button><button data-panel="students">Students</button><button data-panel="guide">How to use</button></aside><article class="admin-workspace" id="adminWorkspace"></article></div></div><footer class="admin-product-footer">Developed and maintained by <strong>Champak Roy</strong></footer></section>`;
+    mount.innerHTML = `<section class="admin-standalone"><header class="admin-shell-header"><div><img src="favicon.svg?v=upnaukriguru" alt="" width="48" height="48"><span><strong>UP NaukriGuru Administration</strong><small>Content, validation and student management</small></span></div><div><a class="ghost-button" href="#/landing">Open student site</a><button class="ghost-button" id="adminSignOut" type="button">Sign out</button></div></header><div class="page admin-page"><div class="page-hero compact"><span class="eyebrow">ADMINISTRATION</span><h1>Administration dashboard</h1><p>Manage exam content, validations and student registrations.</p></div><div class="admin-console"><aside class="admin-menu"><button data-panel="overview" class="active">Overview</button><button data-panel="validation">Validation</button><button data-panel="builder">Test builder</button><button data-panel="topic">Topic practice</button><button data-panel="content">Exam content</button><button data-panel="students">Students</button><button data-panel="guide">How to use</button></aside><article class="admin-workspace" id="adminWorkspace"></article></div></div><footer class="admin-product-footer">Developed and maintained by <strong>Champak Roy</strong></footer></section>`;
     document.getElementById('adminSignOut').onclick = async () => {
       if (info.testing) {
         try { await Api.auth('admin', {action:'temporary-logout'}, token); } catch (_) {}
@@ -63,6 +63,14 @@
           Api, token, exams: state.exams,
           onDirtyChange(value) { dirty = value; }
         });
+      }
+      if (name === 'topic') {
+        workspace.innerHTML = '<div id="topicPracticeAdminMount"></div>';
+        if (!window.TopicPracticeAdmin) {
+          workspace.innerHTML = '<h2>Topic editor unavailable</h2><p>Reload the page to load the topic editor.</p>';
+          return;
+        }
+        await window.TopicPracticeAdmin.mount(workspace.querySelector('#topicPracticeAdminMount'), token, value => { dirty = value; });
       }
       if (name === 'validation') {
         workspace.innerHTML = '<p>Loading validation queue…</p>';
@@ -141,6 +149,7 @@
       }
       if (name === 'guide') workspace.innerHTML = `<h2>How to use NaukriPreps Administration</h2>
         <p><strong>For most new tests, use Test builder.</strong> It has ordinary forms. You do not need to know JSON, question IDs or answer numbers.</p>
+        <h3>Topic-wise Practice add-on</h3><p>Open <b>Topic practice</b> in the admin menu to enable or disable the feature, choose an existing practice test, set the subject/category, assign topics and difficulty, edit options and write instant-feedback explanations. The feature draws only from published non-diagnostic practice tests. Save changes after checking; editing a source question also affects that practice test. Completed topic-practice reports are saved to student accounts. The module is not yet linked to paid subscriptions.</p>
         <h3>1. Create a new practice or mock test</h3>
         <ol class="admin-guide">
           <li>Open <b>Test builder</b> in the admin menu, then choose <b>+ New test</b>.</li>
