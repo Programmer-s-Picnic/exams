@@ -338,6 +338,7 @@
       inventory: () => { location.hash = '#/admin'; },
       onboarding: renderOnboarding,
       tests: renderTests,
+      'topic-practice': () => window.TopicPractice.mount(state, authToken()),
       diagnostic: renderDiagnosticSelection,
       instructions: () => renderInstructions(id),
       attempt: () => beginAttempt(id),
@@ -647,6 +648,7 @@
         <div class="section-heading"><div><span class="eyebrow">QUICK ACCESS</span><h2>${copy.quickTitle}</h2></div></div>
         <div class="quick-grid">
           <a href="#/tests"><span>${icon('test')}</span><strong>Start a test</strong><small>Browse available practice</small></a>
+          <a href="#/topic-practice"><span>${icon('test')}</span><strong>Topic-wise practice</strong><small>Instant answers and explanations</small></a>
           <a href="#/results"><span>${icon('chart')}</span><strong>Performance</strong><small>Review recent attempts</small></a>
           <a href="#/onboarding"><span>${icon('land')}</span><strong>Exam goals</strong><small>Update your targets</small></a>
           <a href="#/help"><span>${icon('teacher')}</span><strong>How to use</strong><small>Follow the student workflow</small></a>
@@ -997,6 +999,7 @@
           <p>Practice tests for your chosen examination. The administrator controls which sets are available.</p>
           <div class="result-actions">
             <a class="ghost-button" href="#/home">← Dashboard</a>
+             <a class="primary-button" href="#/topic-practice">Topic-wise practice →</a>
             ${exam.id === 'up-police' ? '<a class="ghost-button" href="#/constable">Exam overview, syllabus and papers →</a>' : ''}
           </div>
         </div>
@@ -1021,6 +1024,7 @@
     document.getElementById('app').innerHTML = `
       <section class="page">
         <div class="page-hero compact"><span class="eyebrow">PRACTICE LIBRARY</span><h1>Choose your next test</h1><p>Use focused practice to find gaps before the real examination does.</p></div>
+        <div class="result-actions"><a class="primary-button" href="#/topic-practice">Topic-wise practice with instant feedback →</a></div>
         <div class="filter-bar">
           <label class="search-box">⌕<input id="testSearch" placeholder="Search tests" value="${escapeHtml(state.filters.query)}"></label>
           <select id="examFilter"><option value="all">All examinations</option>${state.exams.filter(exam => exam.available).map(exam => `<option value="${exam.id}" ${state.filters.exam === exam.id ? 'selected' : ''}>${exam.name}</option>`).join('')}</select>
