@@ -50,7 +50,7 @@ async function mount(host, token, onDirtyChange){
       '<div class="result-actions"><button class="ghost-button" id="tpaCheck">Check questions</button>'+
       '<button class="primary-button" id="tpaSave"'+(!t?' disabled':'')+'>Save questions to server</button></div>'+
       '<p id="tpaStatus" class="admin-status" role="status">'+(dirty?'Unsaved changes.':'Ready to edit.')+'</p></article></section>';
-    host.querySelector('#tpaTest').onchange=e=>{if(dirty&&!confirm('Discard unsaved question edits?')){draw();return;}selected=e.target.value;selectedIndex=0;setDirty(false);draw();};
+    host.querySelector('#tpaTest').onchange=e=>{if(dirty){status('Save this question set before switching to another.');draw();return;}selected=e.target.value;selectedIndex=0;draw();};
     if(t){
       host.querySelector('#tpaQuestion').onchange=e=>{selectedIndex=Number(e.target.value);draw();};
       host.querySelector('#tpaCategory').oninput=e=>{t.category=e.target.value;setDirty(true);};
