@@ -171,7 +171,7 @@ facts("gk","economy-cyber","अर्थव्यवस्था, कृषि �
 ]);
 // Numeric topics: accurately computed integer examples and worked explanations.
 const A=[];
-[[5,10,15,20],[12,18,24,30],[7,9,11,13],[20,30,40,50],[8,12,16,20]].forEach(a=>{
+[[5,10,15,30],[12,18,24,30],[7,9,11,13],[20,30,40,50],[8,12,16,20]].forEach(a=>{
  const total=a.reduce((p,n)=>p+n,0), avg=total/a.length;
  A.push(calc(a.join(', ')+' का अंकगणितीय औसत क्या होगा?',avg,
  'औसत = कुल योग / पदों की संख्या = '+total+'/'+a.length+' = '+avg+'।'));
@@ -188,7 +188,7 @@ const A=[];
 });
 numbers("numerical","average","औसत",A);
 const WORK=[];
-[[6,3],[8,4],[10,5],[12,6],[15,5]].forEach(([a,b])=>{
+[[6,3],[8,8],[10,10],[12,6],[15,30]].forEach(([a,b])=>{
  const together=a*b/(a+b);
  if(!Number.isInteger(together))throw Error("work "+a);
  WORK.push(calc('A एक कार्य को '+a+' दिन में और B '+b+' दिन में करता है। दोनों मिलकर कितने दिन में करेंगे?',together,
