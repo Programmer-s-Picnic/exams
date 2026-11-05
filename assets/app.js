@@ -898,6 +898,7 @@
     const paperYears = [...new Set(papers.map(item => item.year))].sort((a, b) => Number(b) - Number(a));
     const tests = state.tests.filter(test => test.id.startsWith('up-police-constable-') && !test.baseTestId);
     const pattern = exam.officialPattern || {};
+    const recruitment = exam.recruitment2025 || {};
     const studyCards = (exam.studyPlan || []).map(item => `<article class="hub-tile"><small>WEEK ${escapeHtml(item.week)}</small><h3>${escapeHtml(item.focus)}</h3><p>${escapeHtml(item.activities)}</p></article>`).join('');
     const results = TestEngine.getResults().filter(result => tests.some(test => test.id === (result.baseTestId || result.testId)));
     const latest = results[0];
@@ -927,7 +928,7 @@
       <section class="page constable-hub">
         <a class="back-link" href="#/home">← Dashboard</a>
         <div class="page-hero"><span class="eyebrow">YOUR EXAM</span><h1>${escapeHtml(exam.name)}</h1><p>${escapeHtml(exam.description)}</p><p><strong>Current recorded cycle:</strong> ${escapeHtml(exam.status || 'Recruitment status: check official UPPRPB website')}</p></div>
-        <nav class="hub-nav" aria-label="Constable sections">${[['overview','Overview'],['howto','How to use'],['syllabus','Syllabus'],['papers','Previous papers'],['practice','Practice'],['study','8-week plan'],['physical','Physical'],['settings','Test modes'],['results','Results'],['stages','Stages']].map(([id,label]) => `<button type="button" data-hub-section="constable-${id}">${label}</button>`).join('')}</nav>
+        <nav class="hub-nav" aria-label="Constable sections">${[['overview','Overview'],['recruitment','Recruitment 2025'],['howto','How to use'],['syllabus','Syllabus'],['papers','Previous papers'],['practice','Practice'],['study','8-week plan'],['physical','Physical'],['settings','Test modes'],['results','Results'],['stages','Stages']].map(([id,label]) => `<button type="button" data-hub-section="constable-${id}">${label}</button>`).join('')}</nav>
 
         <section class="hub-section" id="constable-overview">
           <h2>Exam overview and official documents</h2>
@@ -938,6 +939,19 @@
           <div id="officialDocument" class="document-frame" hidden><div class="document-heading"><strong id="documentTitle"></strong><a id="documentOriginal" href="#" target="_blank" rel="noopener noreferrer">Open original ↗</a></div><iframe id="documentIframe" title="Official Constable document" loading="lazy" referrerpolicy="no-referrer"></iframe><p>Preview unavailable? Use “Open original” above. Official websites can prevent embedding.</p></div>
         </section>
 
+        <section class="hub-section" id="constable-recruitment">
+          <h2>Recruitment 2025 · eligibility and vacancies</h2>
+          <p>This historic recruitment cycle is not open for applications. The Board published the final selection result on 14 October 2026. Rules may change in the next cycle.</p>
+          <div class="hub-grid">
+            <article class="hub-tile"><small>ADVERTISED VACANCIES</small><h3>${Number(recruitment.posts || 32679).toLocaleString("en-IN")}</h3><p>Constable Civil Police and equivalent posts, Recruitment 2025.</p></article>
+            <article class="hub-tile"><small>EDUCATION</small><h3>Class 12 / Intermediate</h3><p>Recognised equivalent qualifications accepted; appearing candidates were not eligible for this 2025 cycle.</p></article>
+            <article class="hub-tile"><small>APPLICATION FEE (2025)</small><h3>₹500 / ₹400</h3><p>General/EWS/OBC: ₹500. SC/ST: ₹400.</p></article>
+            <article class="hub-tile"><small>PAY MATRIX (2025)</small><h3>Level 3</h3><p>Basic-pay matrix ₹21,700–₹69,100, excluding allowances.</p></article>
+            <article class="hub-tile"><small>AGE LIMIT (2025, AFTER SPECIAL RELAXATION)</small><h3>Men: 18–25 / Women: 18–28</h3><p>General/EWS. One-time three-year upper-age relaxation in the 05 Jan 2026 corrigendum; reference date 01 Jul 2025.</p></article>
+            <article class="hub-tile"><small>SC/ST/OBC AGE LIMIT (2025)</small><h3>Men: 18–30 / Women: 18–33</h3><p>For eligible reservation categories with additional five-year relaxation. Check domicile and category rules in the original notice.</p></article>
+          </div>
+          <a class="ghost-button" href="${escapeHtml(recruitment.ageCorrigendumSource || pattern.syllabusSource)}" target="_blank" rel="noopener noreferrer">Read 5 Jan 2026 age corrigendum ↗</a>
+        </section>
         <section class="hub-section" id="constable-howto">
           <h2>How to use this exam</h2>
           <div class="hub-grid">
