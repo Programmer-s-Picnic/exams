@@ -63,8 +63,8 @@
     const levels = sort([...new Set(all.filter(x=>x.subject===state.subject && x.topic===state.topic).map(x=>x.difficulty))]);
     if (state.difficulty !== 'All' && !levels.includes(state.difficulty)) state.difficulty = 'All';
     const eligible = filtered(app);
-    const counts = [5,10,15,20,25,50].filter(n=>n<=Math.max(eligible.length,1));
-    if (eligible.length && !counts.includes(state.count)) state.count = counts.reduce((a,b)=>Math.abs(b-state.count)<Math.abs(a-state.count)?b:a,counts[0]||1);
+    const counts = eligible.length ? [...new Set([Math.min(eligible.length,5),...([10,15,20,25,50].filter(n=>n<=eligible.length))])] : [];
+    if (eligible.length && !counts.includes(state.count)) state.count = counts.reduce((a,b)=>Math.abs(b-state.count)<Math.abs(a-state.count)?b:a,counts[0]);
     if (!counts.length) state.count = 1;
     mount.innerHTML =
       '<section class="page tp-page"><div class="page-hero compact"><span class="eyebrow">FOCUSED LEARNING</span><h1>Topic-wise Practice</h1>'+
@@ -188,6 +188,7 @@
     try {
       await state.saving.catch(()=>{});
       await Api.auth('results',{result},token);
+      TestEngine.mergeResults([result]);
       try{await Api.auth('topic-practice',{action:'clear',attemptId:draft.attemptId},token);}catch(e){console.warn('Draft cleanup deferred',e);}
       state.draft=null;state.busy=false;state.error='';
       mount.innerHTML='<section class="page narrow"><article class="tp-card"><span class="eyebrow">SESSION COMPLETE</span>'+
