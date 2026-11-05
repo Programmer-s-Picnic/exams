@@ -63,7 +63,7 @@
     const levels = sort([...new Set(all.filter(x=>x.subject===state.subject && x.topic===state.topic).map(x=>x.difficulty))]);
     if (state.difficulty !== 'All' && !levels.includes(state.difficulty)) state.difficulty = 'All';
     const eligible = filtered(app);
-    const counts = eligible.length ? [...new Set([Math.min(eligible.length,5),...([10,15,20,25,50].filter(n=>n<=eligible.length))])] : [];
+    const counts = eligible.length ? [...new Set([Math.min(eligible.length,5),...([10,15,20,25,50].filter(n=>n<=eligible.length)),Math.min(eligible.length,50)])].sort((a,b)=>a-b) : [];
     if (eligible.length && !counts.includes(state.count)) state.count = counts.reduce((a,b)=>Math.abs(b-state.count)<Math.abs(a-state.count)?b:a,counts[0]);
     if (!counts.length) state.count = 1;
     mount.innerHTML =
