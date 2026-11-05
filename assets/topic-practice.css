@@ -1,0 +1,25 @@
+.tp-page,.tpa-page{max-width:1100px;margin:0 auto}
+.tp-card,.tpa-box{background:var(--surface,#fff);color:var(--text,#172b45);border:1px solid rgba(67,116,180,.22);border-radius:18px;padding:clamp(18px,3vw,28px);margin:20px 0;box-shadow:0 4px 20px rgba(24,60,100,.04)}
+.tp-card h2,.tpa-box h3{margin-top:0}
+.tp-grid,.tpa-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin:14px 0}
+.tp-field,.tpa-box label{display:flex;flex-direction:column;gap:7px;font-weight:600;font-size:.94rem;min-width:0}
+.tp-field input,.tp-field select,.tpa-box input:not([type=checkbox]),.tpa-box select,.tpa-box textarea{width:100%;min-width:0;padding:11px 12px;color:#1a2e47;background:#f8fbff;border:1px solid #afc5e3;border-radius:10px;font:inherit}
+.tp-field input:focus,.tp-field select:focus,.tpa-box input:focus,.tpa-box select:focus,.tpa-box textarea:focus{outline:2px solid #3a82d1;outline-offset:1px}
+.tpa-box>label{margin:15px 0}.tpa-box .tpa-toggle{flex-direction:row;align-items:center;gap:10px}
+.tpa-toggle input{width:18px;height:18px}
+.tp-available,.tp-qhead{color:#496583}
+.tp-qhead{display:flex;justify-content:space-between;gap:15px;margin-bottom:16px}
+.tp-progress{height:9px;background:#dceaf8;border-radius:999px;overflow:hidden;margin:15px 0}
+.tp-progress span{display:block;height:100%;background:#2475bc;border-radius:inherit}
+.tp-options{display:grid;gap:10px;margin:20px 0}
+.tp-option{display:flex;align-items:center;gap:14px;padding:13px 15px;border:1px solid #b7cce3;border-radius:11px;cursor:pointer;background:#f9fcff}
+.tp-option:has(input:checked){border-color:#2580c4;background:#eaf4ff}
+.tp-option b{width:28px;height:28px;border-radius:7px;background:#e2edf9;display:grid;place-items:center;color:#234d7e;flex-shrink:0}
+.tp-option.tp-correct{border-color:#32a36a;background:#e9f8ee}
+.tp-option.tp-incorrect{border-color:#d56a6a;background:#fff0f0}
+.tp-option input{accent-color:#2e77b6}
+.tp-feedback{background:#f0f7ff;border-left:4px solid #3178bb;border-radius:9px;padding:16px;margin:16px 0}
+.tp-feedback p{margin:8px 0 0;white-space:pre-wrap}
+.tp-card pre{overflow:auto;padding:14px;background:#102d4b;color:#edf5ff;border-radius:10px}
+.tpa-page{width:100%}.tpa-page .result-actions,.tp-card .result-actions{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0 8px}
+@media(max-width:600px){.tp-card,.tpa-box{padding:16px}.tp-grid,.tpa-grid{grid-template-columns:1fr}.tp-qhead{flex-direction:column}}
