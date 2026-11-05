@@ -167,7 +167,7 @@
       restoreReloadRoute();
       route();
       window.addEventListener('hashchange', route);
-      window.addEventListener('pagehide', rememberRoute);
+      window.addEventListener('pagehide', () => { rememberScroll(); rememberRoute(); });
     } catch (error) {
       document.getElementById('app').innerHTML = `<section class="error-state"><div class="empty-icon">!</div><h1>We could not load the application</h1><p>Please try again in a moment.</p><button class="primary-button" onclick="location.reload()">Try again</button></section>`;
     }
@@ -224,6 +224,32 @@
   // survive a refresh; session storage is a fallback when a browser/webview drops it.
   // Restore only on a real reload, never on a fresh visit to the home URL.
   const LAST_ROUTE_KEY = 'he_last_route_v1';
+  const SCROLL_KEY = 'he_scroll_position_v1';
+  const reloadNavigation = performance.getEntriesByType?.('navigation')?.[0]?.type === 'reload';
+  let initialRoutePending = true;
+  // Prevent the browser's automatic restoration fighting with SPA rendering.
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  function rememberScroll() {
+    try {
+      sessionStorage.setItem(SCROLL_KEY, JSON.stringify({
+        route: location.hash, y: window.scrollY
+      }));
+    } catch (_) {}
+  }
+  function settleRouteScroll(initial) {
+    if (!initial) {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      rememberScroll();
+      return;
+    }
+    let saved = null;
+    try { saved = JSON.parse(sessionStorage.getItem(SCROLL_KEY) || 'null'); } catch (_) {}
+    if (!reloadNavigation || !saved || saved.route !== location.hash || !Number.isFinite(saved.y)) return;
+    // Restore only after the requested page has been inserted into the DOM.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      window.scrollTo({ top: Math.max(0, saved.y), left: 0, behavior: 'instant' });
+    }));
+  }
   function rememberRoute() {
     const hash = window.location.hash;
     if (!/^#\/[a-z][a-z0-9-]*(?:\/[^?#]*)?(?:\?.*)?$/i.test(hash)) return;
@@ -329,7 +355,8 @@
       await syncResultsWithServer();
       renderResults();
     };
-    window.scrollTo(0, 0);
+    settleRouteScroll(initialRoutePending);
+    initialRoutePending = false;
   }
 
   function renderLanding(scrollTarget = null) {
