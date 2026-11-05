@@ -897,6 +897,7 @@
     const paperYears = [...new Set(papers.map(item => item.year))].sort((a, b) => Number(b) - Number(a));
     const tests = state.tests.filter(test => test.id.startsWith('up-police-constable-') && !test.baseTestId);
     const pattern = exam.officialPattern || {};
+    const studyCards = (exam.studyPlan || []).map(item => `<article class="hub-tile"><small>WEEK ${escapeHtml(item.week)}</small><h3>${escapeHtml(item.focus)}</h3><p>${escapeHtml(item.activities)}</p></article>`).join('');
     const results = TestEngine.getResults().filter(result => tests.some(test => test.id === (result.baseTestId || result.testId)));
     const latest = results[0];
     const weak = latest && Object.entries(latest.topicScores || {}).sort((a, b) => a[1].correct / a[1].total - b[1].correct / b[1].total)[0]?.[0];
@@ -924,7 +925,7 @@
     document.getElementById('app').innerHTML = `
       <section class="page constable-hub">
         <a class="back-link" href="#/home">← Dashboard</a>
-        <div class="page-hero"><span class="eyebrow">YOUR EXAM</span><h1>${escapeHtml(exam.name)}</h1><p>${escapeHtml(exam.description)}</p></div>
+        <div class="page-hero"><span class="eyebrow">YOUR EXAM</span><h1>${escapeHtml(exam.name)}</h1><p>${escapeHtml(exam.description)}</p><p><strong>Current recorded cycle:</strong> ${escapeHtml(exam.status || 'Recruitment status: check official UPPRPB website')}</p></div>
         <nav class="hub-nav" aria-label="Constable sections">${[['overview','Overview'],['howto','How to use'],['syllabus','Syllabus'],['papers','Previous papers'],['practice','Practice'],['study','8-week plan'],['physical','Physical'],['settings','Test modes'],['results','Results'],['stages','Stages']].map(([id,label]) => `<button type="button" data-hub-section="constable-${id}">${label}</button>`).join('')}</nav>
 
         <section class="hub-section" id="constable-overview">
@@ -960,7 +961,7 @@
               <article class="hub-tile"><small>SOURCE</small><h3>UPPRPB official notification</h3><p>Appendix 1 · pages ${escapeHtml((syllabus.sourcePages || []).join('–'))}</p><a class="ghost-button" href="${escapeHtml(syllabus.source)}" target="_blank" rel="noopener noreferrer">Open government source ↗</a></article>
             </div>
             <div class="hub-grid">${syllabus.sections.map(section => `<article class="hub-tile"><h3>${escapeHtml(section.name)}</h3><ul>${section.topics.map(topic => `<li>${escapeHtml(topic)}</li>`).join('')}</ul></article>`).join('')}</div>
-          ` : '<p>Syllabus details will be available shortly.</p>'}
+          ` : '<p>The detailed official syllabus has been imported but is pending exam-site administrator validation. Until the administrator approves it, use the original UPPRPB notification (Appendix 1, pages 28–29) directly. The four written-exam subjects are General Knowledge, General Hindi, Numerical and Mental Ability, and Mental Aptitude/IQ/Reasoning.</p><a class="primary-button" href="https://uppbpb.gov.in/FilesUploaded/Notice/CONSTABLE-VIGYAPTIc7be0cc8-3365-471e-9237-447c528d341a.pdf" target="_blank" rel="noopener noreferrer">Open official syllabus PDF →</a>'}
         </section>
 
         <section class="hub-section" id="constable-papers">
@@ -971,6 +972,25 @@
         </section>
 
         <section class="hub-section" id="constable-practice"><h2>Practice and mock tests</h2><p>Choose immediate-feedback topic practice or original full-length 150-question, 120-minute mocks. Our mock papers are not official UPPRPB papers; their subject split is editorial.</p><div class="result-actions"><a class="primary-button" href="#/topic-practice">Topic-wise practice →</a></div><div class="test-list">${tests.map(test => testCard(test, results)).join('') || '<p>No practice tests are available yet.</p>'}</div></section>
+        <section class="hub-section" id="constable-study">
+          <h2>Eight-week preparation plan</h2>
+          <p>This is our suggested study schedule, not an official UPPRPB timetable. Practise a topic daily, review explanations, and sit full-length mocks in the final weeks.</p>
+          <div class="hub-grid">${studyCards}</div>
+          <a class="primary-button" href="#/topic-practice">Start topic practice →</a>
+        </section>
+        <section class="hub-section" id="constable-physical">
+          <h2>Physical standards and qualifying run</h2>
+          <p>Recruitment-2025 criteria only. Confirm later recruitment rules from the Board before relying on these figures.</p>
+          <div class="hub-grid">
+            <article class="hub-tile"><small>MEN · GENERAL / OBC / SC</small><h3>168 cm</h3><p>Minimum height. Chest 79/84 cm (unexpanded/expanded), with at least 5 cm expansion.</p></article>
+            <article class="hub-tile"><small>MEN · ST</small><h3>160 cm</h3><p>Minimum height. Chest 77/82 cm with at least 5 cm expansion.</p></article>
+            <article class="hub-tile"><small>WOMEN · GENERAL / OBC / SC</small><h3>152 cm</h3><p>Minimum height and 40 kg minimum weight.</p></article>
+            <article class="hub-tile"><small>WOMEN · ST</small><h3>147 cm</h3><p>Minimum height and 40 kg minimum weight.</p></article>
+            <article class="hub-tile"><small>MEN · PET RUN</small><h3>4.8 km / 25 min</h3><p>Physical efficiency test. Qualifying, not a scored written-exam section.</p></article>
+            <article class="hub-tile"><small>WOMEN · PET RUN</small><h3>2.4 km / 14 min</h3><p>Physical efficiency test. Qualifying, not a scored written-exam section.</p></article>
+          </div>
+          <a class="ghost-button" href="${escapeHtml(pattern.syllabusSource || syllabus.source)}" target="_blank" rel="noopener noreferrer">Official recruitment notice · pages 11–12 ↗</a>
+        </section>
         <section class="hub-section" id="constable-settings"><h2>Choose your test mode</h2><p>Each test lets you choose a whole-test timer, a per-question timer or untimed practice. Check answers after each question or only after submission.</p><a class="primary-button" href="#/tests">Browse test settings →</a></section>
         <section class="hub-section" id="constable-results"><h2>Results and retakes</h2><p>${latest ? `${results.length} attempt${results.length === 1 ? '' : 's'} · latest score ${latest.percent}%. ${weak ? `Suggested next focus: ${escapeHtml(weak)}.` : ''}` : 'Complete a practice test to see your score, explanations and topic analysis.'}</p>${latest ? `<a class="primary-button" href="#/result/${latest.id}">Review latest result →</a>` : '<a class="primary-button" href="#/tests">Start practising →</a>'}<p>On the result page, retake unanswered, unanswered and wrong, wrong only, or all questions with fresh shuffles.</p></section>
         <section class="hub-section" id="constable-stages"><h2>Recruitment stages</h2><div class="hub-grid">${exam.stages.map((stage, index) => `<article class="hub-tile"><small>STAGE ${index + 1}</small><h3>${escapeHtml(stage.name)}</h3><p>${escapeHtml(stage.description)}</p></article>`).join('')}</div><p>For current criteria and schedules, use the official links above.</p></section>
