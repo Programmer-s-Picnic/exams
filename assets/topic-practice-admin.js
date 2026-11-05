@@ -39,7 +39,8 @@ async function mount(host, token, onDirtyChange){
       (t?'<div class="tpa-grid"><label>Subject / category<input id="tpaCategory" value="'+esc(t.category||'')+'"></label>'+
       '<label class="tpa-toggle"><input id="tpaPublished" type="checkbox"'+(t.available?' checked':'')+'> Make this entire practice set available</label></div>'+
       '<p class="admin-status">'+(t.questions||[]).length+' question(s) · '+esc((t.examIds||[]).join(', '))+'</p>':'<p>No practice sets are available. Create a practice set through Test builder first.</p>')+
-      (q?'<div class="tpa-grid"><label>Topic<input id="tpaTopic" value="'+esc(q.topic||'')+'"></label>'+
+      (q?'<div class="tpa-grid"><label>Topic<input id="tpaTopic" value="'+esc(q.topicName||q.topic||'')+'"></label>'+
+      '<label>Subject override (optional)<input id="tpaSubject" value="'+esc(q.subject||'')+'" placeholder="Defaults to test category"></label>'+
       '<label>Question difficulty<select id="tpaDifficulty">'+['Foundation','Beginner','Easy','Medium','Advanced','Hard'].map(x=>opt(x,x,q.difficulty||t.difficulty||'Foundation')).join('')+'</select></label></div>'+
       '<label>Question<textarea id="tpaText" rows="3">'+esc(q.question||'')+'</textarea></label>'+
       '<div class="tpa-grid">'+(q.options||[]).map((value,i)=>'<label>Option '+String.fromCharCode(65+i)+'<input data-tpa-option="'+i+'" value="'+esc(value)+'"></label>').join('')+'</div>'+
@@ -58,7 +59,8 @@ async function mount(host, token, onDirtyChange){
     }
     if(q){
       const bind=(id,key,transform=x=>x)=>host.querySelector('#'+id).oninput=e=>{q[key]=transform(e.target.value);setDirty(true);};
-      bind('tpaTopic','topic');bind('tpaDifficulty','difficulty');bind('tpaText','question');
+      host.querySelector('#tpaTopic').oninput=e=>{q.topic=e.target.value;if(q.topicName!==undefined)q.topicName=e.target.value;setDirty(true);};
+      bind('tpaSubject','subject');bind('tpaDifficulty','difficulty');bind('tpaText','question');
       bind('tpaCorrect','correctOption',Number);bind('tpaExplanation','explanation');
       host.querySelectorAll('[data-tpa-option]').forEach(e=>e.oninput=event=>{q.options[Number(event.target.dataset.tpaOption)]=event.target.value;setDirty(true);});
       host.querySelector('#tpaAdd').onclick=()=>{
