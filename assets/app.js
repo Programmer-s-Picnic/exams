@@ -37,6 +37,7 @@
   function practiceTestsForExam(examId) {
     return state.tests.filter(test =>
       !test.baseTestId &&
+      !test.topicPracticeOnly &&
       test.audience !== 'guest' &&
       test.type !== 'diagnostic' &&
       !/diagnostic/i.test(test.title || '') &&
@@ -608,7 +609,7 @@
     document.body.classList.remove('auth-mode');
     const copy = state.config.content.dashboard;
     const primary = state.exams.find(exam => exam.id === state.preferences.primary);
-    const relevantTests = state.tests.filter(test => test.available && test.examIds.includes(state.preferences.primary));
+    const relevantTests = state.tests.filter(test => test.available && !test.topicPracticeOnly && test.examIds.includes(state.preferences.primary));
     const results = TestEngine.getResults();
     const storedAttempt = TestEngine.activeAttempt();
     // A result completed after an attempt started makes a leftover saved attempt stale.
@@ -1041,7 +1042,7 @@
     const completed = new Set(TestEngine.getResults().map(result => result.testId));
     const query = state.filters.query.toLowerCase();
     return state.tests.filter(test => {
-      if (test.audience === 'guest') return false;
+      if (test.audience === 'guest' || test.topicPracticeOnly) return false;
       const matchesText = !query || `${test.title} ${test.description} ${test.category}`.toLowerCase().includes(query);
       const matchesExam = state.filters.exam === 'all' || test.examIds.includes(state.filters.exam);
       const matchesStatus = state.filters.status === 'all' || (state.filters.status === 'completed' ? completed.has(test.id) : !completed.has(test.id));
