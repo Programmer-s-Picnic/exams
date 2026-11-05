@@ -15,7 +15,7 @@ async function mount(host, token, onDirtyChange){
     if(!host.isConnected)return;
     loaded=tests.content;revision=tests.revision;config=site.content;configRevision=site.revision;
   }catch(e){host.innerHTML='<p role="alert">'+esc(e.message)+'</p>';return;}
-  const eligible=()=>loaded.tests.filter(t=>t.audience!=='guest'&&t.type!=='diagnostic'&&
+  const eligible=()=>loaded.tests.filter(t=>t.audience!=='guest'&&t.type!=='diagnostic'&&!t.fullMock&&
     !/diagnostic/i.test(String(t.title||'')+' '+String(t.category||'')) &&
     Array.isArray(t.examIds)&&t.examIds.length);
   const current=()=>eligible().find(t=>t.id===selected);
