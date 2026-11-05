@@ -900,7 +900,7 @@
     const pattern = exam.officialPattern || {};
     const recruitment = exam.recruitment2025 || {};
     const studyCards = (exam.studyPlan || []).map(item => `<article class="hub-tile"><small>WEEK ${escapeHtml(item.week)}</small><h3>${escapeHtml(item.focus)}</h3><p>${escapeHtml(item.activities)}</p></article>`).join('');
-    const results = TestEngine.getResults().filter(result => tests.some(test => test.id === (result.baseTestId || result.testId)));
+    const results = TestEngine.getResults().filter(result => tests.some(test => test.id === (result.baseTestId || result.testId)) || (result.type === 'topic-practice' && result.examId === exam.id));
     const latest = results[0];
     const weak = latest && Object.entries(latest.topicScores || {}).sort((a, b) => a[1].correct / a[1].total - b[1].correct / b[1].total)[0]?.[0];
 
@@ -1054,7 +1054,7 @@
     const previous = results.find(result => result.testId === test.id);
     return `<article class="test-card">
       <div class="test-card-icon">${icon(test.icon || 'test')}</div>
-      <div class="test-card-copy"><span class="tag-row"><i>${test.difficulty}</i><i>${test.category}</i></span><h3>${test.title}</h3><p>${test.description}</p><div class="test-facts"><span><b>${test.questions.length}</b> questions</span><span><b>${Math.round(test.timing.totalSeconds / 60)}</b> minutes</span><span><b>${test.totalMarks}</b> marks</span><span><b>${test.marking?.correct == null ? 'Per question' : `+${test.marking.correct}`} / ${test.marking?.incorrect ?? -Number(test.negativeMarking || 0)}</b> correct / wrong</span></div></div>
+      <div class="test-card-copy"><span class="tag-row"><i>${test.difficulty}</i><i>${test.category}</i></span><h3>${test.title}</h3><p>${test.description}</p>${test.fullMock ? '<p class="guest-access-note">Original practice only. The mock pass indicator uses the Unreserved 30% reference; official EWS/OBC threshold is 25% and SC/ST threshold is 20%. Actual recruitment evaluation is performed by UPPRPB.</p>' : ''}<div class="test-facts"><span><b>${test.questions.length}</b> questions</span><span><b>${Math.round(test.timing.totalSeconds / 60)}</b> minutes</span><span><b>${test.totalMarks}</b> marks</span><span><b>${test.marking?.correct == null ? 'Per question' : `+${test.marking.correct}`} / ${test.marking?.incorrect ?? -Number(test.negativeMarking || 0)}</b> correct / wrong</span></div></div>
       <div class="test-card-action">${test.available ? `${previous ? `<span class="previous-score">${previous.percent}%<small>Latest score</small></span>` : '<span class="new-label">Not attempted</span>'}<a class="primary-button" href="#/instructions/${test.id}">${previous ? 'Retake test' : 'View test'} →</a>` : '<span class="coming-soon-action">Coming soon</span>'}</div>
     </article>`;
   }
@@ -1270,7 +1270,7 @@
       <section class="page narrow">
         <article class="result-hero ${result.passed ? 'passed' : 'failed'}">
           <span class="eyebrow">${result.autoSubmitted ? 'TIME ENDED · AUTOMATICALLY SUBMITTED' : 'TEST COMPLETE'}</span>
-          <h1>${result.passed ? 'Well done!' : 'Keep practising'}</h1><p>${test.title}</p>
+          <h1>${result.passed ? 'Well done!' : 'Keep practising'}</h1><p>${test.title}</p>${test.fullMock ? '<p>Full-length original practice mock: the pass indicator uses a 30% Unreserved-category reference, not a recruitment selection decision. Official minimums in the 2025 notice: EWS/OBC 25%, SC/ST 20%.</p>' : ''}
           <div class="result-ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="54"/><circle class="value" cx="60" cy="60" r="54" style="stroke-dashoffset:${circumference - (circumference * result.percent / 100)}"/></svg><span><strong>${result.percent}%</strong><small>${result.score}/${result.totalMarks}</small></span></div>
           <div class="result-status">${result.passed ? '✓ Passed' : 'Preparation needed'}</div>
         </article>
